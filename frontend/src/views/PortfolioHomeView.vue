@@ -48,13 +48,13 @@ const navBlocks = [
   {
     id: 'agent',
     title: 'MyAgent',
-    subtitle: 'AI Agent',
-    description: 'AI 对话 · 同声传译 · 多模态工具箱',
+    subtitle: 'Hermes Agent Web',
+    description: '基于 Hermes 底座的 Agent Web 应用',
     href: AGENT_URL,
     external: true,
     gradient: 'from-emerald-400 via-teal-500 to-cyan-500',
     shadowColor: 'shadow-teal-500/30',
-    features: ['思维链推理', '语音输入', '多模态']
+    features: ['Hermes 底座', 'MCP 工具', '技能扩展']
   },
   {
     id: 'questiongen',
@@ -122,7 +122,7 @@ const navigateTo = (path) => {
           <a
             :href="AGENT_URL"
             class="w-10 h-10 rounded-full bg-gradient-to-br from-emerald-500/20 to-teal-500/20 backdrop-blur-sm flex items-center justify-center hover:from-emerald-500/40 hover:to-teal-500/40 transition-all duration-300 group border border-white/10 hover:border-emerald-400/50"
-            title="MyAgent"
+            title="MyAgent · Hermes"
           >
             <svg class="w-5 h-5 text-white/80 group-hover:text-emerald-300 transition-colors" viewBox="0 0 24 24" fill="currentColor">
               <path d="M12 1.5l2 5.5 5.5 2-5.5 2-2 5.5-2-5.5L4.5 9l5.5-2 2-5.5z" fill-opacity="0.92"/>
