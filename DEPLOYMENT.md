@@ -85,7 +85,7 @@ GRANT ALL PRIVILEGES ON DATABASE kitchenbook_db TO kitchenbook_user;
 cd ~
 
 # 从 Git 仓库克隆项目（替换为您的仓库地址）
-git clone https://github.com/linzhiqin2003/KitchenBook.git
+git clone https://github.com/linzhiqin2003/MyWeb.git KitchenBook
 cd KitchenBook
 
 # 创建 Python 虚拟环境
@@ -467,4 +467,3 @@ python manage.py dbshell
 4. 参考故障排查章节
 
 祝您部署顺利！🎉
-

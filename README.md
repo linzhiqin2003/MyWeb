@@ -55,7 +55,7 @@ AI 驱动的智能学习工具，帮助巩固课程知识：
 ### 1. 克隆项目
 
 ```bash
-git clone https://github.com/linzhiqin2003/KitchenBook.git
+git clone https://github.com/linzhiqin2003/MyWeb.git KitchenBook
 cd KitchenBook
 ```
 

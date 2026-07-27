@@ -40,7 +40,7 @@ EOF
 
 # 克隆项目
 cd ~
-git clone https://github.com/yourusername/KitchenBook.git
+git clone https://github.com/linzhiqin2003/MyWeb.git KitchenBook
 cd KitchenBook
 
 # 安装后端
@@ -155,4 +155,3 @@ sudo systemctl status nginx
 ---
 
 **需要完整教程？** 查看 [DEPLOYMENT.md](DEPLOYMENT.md)
-
