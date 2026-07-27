@@ -1,6 +1,6 @@
 # 📖 LZQ 个人网站 - lzqqq.org
 
-一个集博客、AI 工具、学习笔记、私人厨房于一体的多功能个人平台。
+一个集博客、智能学习、私人厨房和个人工具于一体的多功能个人平台。
 
 > 🌐 **在线访问**: 
 > - 主站: [www.lzqqq.org](https://www.lzqqq.org)
@@ -15,7 +15,6 @@
 - 菜谱展示与管理
 - 翻书阅读效果
 - 订单管理系统
-- AI 实验室 (`/kitchen/ai-lab`)
 
 ### 📝 技术博客 (`/blog`)
 分享技术探索与学习心得：
@@ -23,16 +22,6 @@
 - 标签分类系统
 - 暗色/亮色主题切换
 - 精选文章展示
-
-### 🤖 AI 实验室 (`/kitchen/ai-lab`)
-集成 DeepSeek Reasoner + AI 服务工具箱：
-- **思维链推理**: 展示 AI 的推理过程，支持折叠/展开
-- **多模态输入**: 支持图片上传与 OCR 识别
-- **语音交互**: 语音录制转文字
-- **数学公式渲染**: 使用 MathJax 支持 LaTeX 公式
-- **Markdown 渲染**: 完整的 Markdown 语法支持
-- **同声传译** (`/kitchen/ai-lab/studio`): Qwen-ASR + Qwen-MT + Qwen-TTS 实时翻译
-- **表情包生成器** (`/kitchen/ai-lab/studio`): DashScope Emoji 模型生成趣味表情包视频
 
 ### 📚 智能刷题 (`/questiongen`)
 AI 驱动的智能学习工具，帮助巩固课程知识：
@@ -110,8 +99,6 @@ www.lzqqq.org/
 ├── /kitchen                 # 私人厨房首页
 │   ├── /my-orders          # 我的订单
 │   ├── /recipe/:id         # 菜谱详情
-│   ├── /ai-lab             # AI 实验室
-│   ├── /ai-lab/studio      # AI 服务工具箱
 │   └── /chef               # 管理后台
 │       ├── /orders         # 订单管理
 │       ├── /inventory      # 库存管理

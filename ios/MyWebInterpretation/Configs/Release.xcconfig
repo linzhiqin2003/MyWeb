@@ -1,5 +1,0 @@
-// Release config
-PRODUCT_BUNDLE_IDENTIFIER = org.lzqqq.interpretation
-INFOPLIST_FILE = MyWebInterpretationApp/Resources/Info-Release.plist
-MYWEB_API_BASE_URL = https:/$()/www.lzqqq.org
-

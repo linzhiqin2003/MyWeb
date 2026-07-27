@@ -7,12 +7,9 @@ urlpatterns = [
     path("admin/", admin.site.urls),
     path("api/", include("api.urls")),
     path("api/questiongen/", include("questions.urls")),  # QuestionGen 刷题模块
-    path("api/interpretation/", include("apps.interpretation.urls")),
-    path("api/emoji/", include("apps.emoji_generator.urls")),
     path("api/auth/", include("accounts.urls")),
     path("receipts/api/auth/", include("accounts.urls")),
     path("receipts/api/", include("receipts.urls")),
-    path("api/credits/", include("credits.urls")),
 
 ]
 

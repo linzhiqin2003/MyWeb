@@ -62,16 +62,6 @@ const navBlocks = [
     gradient: 'from-violet-500 via-purple-500 to-indigo-500',
     shadowColor: 'shadow-purple-500/30',
     features: ['互动牌阵', 'AI解读']
-  },
-  {
-    id: 'games',
-    title: '联机游戏',
-    subtitle: 'Realtime Games',
-    description: '和朋友一起实时对战',
-    path: '/games',
-    gradient: 'from-emerald-500 via-teal-500 to-cyan-500',
-    shadowColor: 'shadow-teal-500/30',
-    features: ['WebSocket对战', '房间邀请']
   }
 ]
 
@@ -190,8 +180,6 @@ const navigateTo = (path) => {
                 <svg v-else-if="block.id === 'questiongen'" viewBox="0 0 48 48" fill="currentColor"><path d="M24 4C16.3 4 10 10.3 10 18c0 4.8 2.4 9 6 11.6V34a4 4 0 004 4h8a4 4 0 004-4v-4.4c3.6-2.6 6-6.8 6-11.6 0-7.7-6.3-14-14-14zm4 36h-8a2 2 0 010-4h8a2 2 0 010 4z"/></svg>
                 <!-- Tarot: 月亮与星 -->
                 <svg v-else-if="block.id === 'tarot'" viewBox="0 0 48 48" fill="currentColor"><path d="M36 28.6A16 16 0 1119.4 12 12.5 12.5 0 0036 28.6z"/><path d="M38 8l1.2 3.6L43 13l-3.8 1.4L38 18l-1.2-3.6L33 13l3.8-1.4z" opacity="0.7"/></svg>
-                <!-- Games: 骰子 -->
-                <svg v-else-if="block.id === 'games'" viewBox="0 0 48 48" fill="currentColor"><rect x="6" y="6" width="36" height="36" rx="6"/><circle cx="16" cy="16" r="3" fill="rgba(0,0,0,0.3)"/><circle cx="32" cy="16" r="3" fill="rgba(0,0,0,0.3)"/><circle cx="24" cy="24" r="3" fill="rgba(0,0,0,0.3)"/><circle cx="16" cy="32" r="3" fill="rgba(0,0,0,0.3)"/><circle cx="32" cy="32" r="3" fill="rgba(0,0,0,0.3)"/></svg>
               </div>
 
               <div class="relative z-10">
@@ -216,13 +204,6 @@ const navigateTo = (path) => {
                     <path d="M12 5C6 5 1.5 12 1.5 12S6 19 12 19s10.5-7 10.5-7S18 5 12 5z" fill-opacity="0.2"/>
                     <path d="M12 5C6 5 1.5 12 1.5 12S6 19 12 19s10.5-7 10.5-7S18 5 12 5zm0 11a4 4 0 110-8 4 4 0 010 8z" fill-opacity="0.85"/>
                     <circle cx="12" cy="12" r="1.8" fill-opacity="0.95"/>
-                  </svg>
-                  <!-- Games: 手柄 -->
-                  <svg v-else-if="block.id === 'games'" :class="block.featured ? 'w-7 h-7 sm:w-8 sm:h-8' : 'w-6 h-6 sm:w-7 sm:h-7'" viewBox="0 0 24 24" fill="white">
-                    <rect x="2" y="7.5" width="20" height="9" rx="4.5" fill-opacity="0.9"/>
-                    <path d="M8.5 10v4m-2-2h4" stroke="rgba(0,0,0,0.2)" stroke-width="1.6" stroke-linecap="round"/>
-                    <circle cx="15.5" cy="10.5" r="1" fill="rgba(0,0,0,0.15)"/>
-                    <circle cx="18" cy="12.5" r="1" fill="rgba(0,0,0,0.15)"/>
                   </svg>
                 </div>
 

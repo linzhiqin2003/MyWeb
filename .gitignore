@@ -27,6 +27,7 @@ yarn-error.log
 # Build outputs
 dist/
 build/
+/backup/
 *.log
 
 # IDE
@@ -47,27 +48,17 @@ Thumbs.db
 # docs/
 backend/=1.0.0
 
-# Xcode
-*.xcodeproj/
-*.xcworkspace/
-xcuserdata/
-DerivedData/
-*.xcuserstate
-*.xccheckout
-*.xcscmblueprint
-
 # Claude Code local artifacts
 .claude/launch.json
 .claude/scheduled_tasks.lock
 .claude/agent_state*
 
-# Xcode local project (developer tooling, not part of build)
-MyWebInterpretation.xcodeproj
-MyWebInterpretation.xcodeproj/
+# Local tooling, generated reports, and external course source
+.playwright-mcp/
+outputs/
+software-tools/
+software-tools-summaries/
+software-tools-summaries-zh/
 
 # Source notebook files (courseware lives in courses/*/courseware/)
 /软件工程.md
-
-# Hermes 源码 snapshot — 由 deploy/docker/prepare-source.sh 在部署前生成
-deploy/docker/_hermes_source/
-

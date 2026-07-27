@@ -42,11 +42,6 @@ const isQuestionGenPage = computed(() => {
   if (route.path === '/questiongen' || route.path.startsWith('/questiongen/')) return true
   return !route.name && matchesInitial('/questiongen')
 })
-// Games 页面独立布局 (/games)
-const isGamesPage = computed(() => {
-  if (route.path === '/games' || route.path.startsWith('/games/')) return true
-  return !route.name && matchesInitial('/games')
-})
 // Tarot 页面独立布局 (/tarot)
 const isTarotPage = computed(() => {
   if (route.path.startsWith('/tarot')) return true
@@ -95,11 +90,6 @@ const handleFullLogout = () => {
   
   <!-- QuestionGen 刷题独立页面模式 -->
   <div v-else-if="isQuestionGenPage" class="min-h-screen">
-    <RouterView />
-  </div>
-
-  <!-- Games 独立页面模式 -->
-  <div v-else-if="isGamesPage" class="min-h-screen">
     <RouterView />
   </div>
 

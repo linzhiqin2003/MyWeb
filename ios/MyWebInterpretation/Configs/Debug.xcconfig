@@ -1,5 +1,0 @@
-// Debug config
-PRODUCT_BUNDLE_IDENTIFIER = org.lzqqq.interpretation.debug
-INFOPLIST_FILE = MyWebInterpretationApp/Resources/Info-Debug.plist
-MYWEB_API_BASE_URL = https:/$()/www.lzqqq.org
-

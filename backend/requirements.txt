@@ -1,13 +1,6 @@
 Django==5.2.8
 djangorestframework==3.15.2
 django-cors-headers==4.6.0
-channels>=4.0
-daphne>=4.0
-dashscope>=1.25.3
-aiohttp>=3.9.0
-websockets>=12.0
-groq>=0.11.0
-cerebras-cloud-sdk>=1.0.0
 Pillow==11.0.0
 python-dotenv==1.2.1
 openai==1.58.1
@@ -19,7 +12,4 @@ pydantic>=2.6,<3
 yfinance>=0.2.36
 django-allauth[socialaccount]>=65.0,<66
 google-auth>=2.27,<3
-mutagen>=1.47,<2
-PyJWT[crypto]>=2.8,<3
-aliyun-python-sdk-core>=2.16
-nls @ git+https://github.com/aliyun/alibabacloud-nls-python-sdk.git
+cryptography>=42,<47

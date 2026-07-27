@@ -65,8 +65,13 @@ npm install --silent
 npm run build
 
 echo -e "${YELLOW}🔄 7. 重启服务...${NC}"
+# 游戏模块已下线；清理旧部署中可能仍启用的 Daphne 服务。
+if systemctl list-unit-files daphne.service --no-legend 2>/dev/null | grep -q '^daphne.service'; then
+    sudo systemctl disable --now daphne
+    sudo rm -f /etc/systemd/system/daphne.service
+    sudo systemctl daemon-reload
+fi
 sudo systemctl restart gunicorn
-sudo systemctl restart daphne
 sleep 2
 sudo systemctl restart nginx
 
@@ -76,14 +81,6 @@ if systemctl is-active --quiet gunicorn; then
 else
     echo -e "${RED}✗ Gunicorn 启动失败${NC}"
     sudo journalctl -u gunicorn -n 20
-    exit 1
-fi
-
-if systemctl is-active --quiet daphne; then
-    echo -e "${GREEN}✓ Daphne (WebSocket) 运行正常${NC}"
-else
-    echo -e "${RED}✗ Daphne 启动失败${NC}"
-    sudo journalctl -u daphne -n 20
     exit 1
 fi
 

@@ -4,10 +4,10 @@
 
 ## 技术栈
 
-- **后端**: Django 5.2 + DRF + Daphne (WebSocket) | SQLite (开发) / PostgreSQL (生产)
+- **后端**: Django 5.2 + DRF | SQLite (开发) / PostgreSQL (生产)
 - **主前端**: Vue 3 + Vite + Tailwind CSS + Vue Router + Axios
 - **记账前端**: 独立 Vue 3 应用（JWT 认证）
-- **部署**: Nginx + Gunicorn + Daphne + Systemd
+- **部署**: Nginx + Gunicorn + Systemd
 
 ## 项目结构
 
@@ -22,19 +22,15 @@ MyWeb/
 │   ├── readings/            #   塔罗牌阵
 │   ├── oracle/              #   塔罗占卜
 │   ├── questions/           #   AI 出题模块
-│   ├── apps/
-│   │   ├── games/           #   在线游戏：五子棋（WebSocket 实时对战）
-│   │   ├── interpretation/  #   同声传译：ASR + 翻译 + TTS
-│   │   └── emoji_generator/ #   表情包视频生成（DashScope）
-│   ├── common/              #   共享配置：多 LLM 提供商管理
+│   ├── common/              #   共享 DeepSeek 模型与客户端配置
 │   └── media/               #   用户上传文件
-├── frontend/                # 主前端（厨房/博客/AI Lab/塔罗/出题/游戏）
+├── frontend/                # 主前端（厨房/博客/塔罗/出题）
 │   └── src/
 │       ├── views/           #   页面组件
-│       ├── components/      #   可复用组件（含 ailab/ tarot/ 子目录）
+│       ├── components/      #   可复用组件（含 blog/ tarot/ 子目录）
 │       ├── api/             #   API 客户端模块
 │       ├── store/           #   状态管理 (auth.js, cart.js)
-│       ├── config/          #   配置文件 (api.js, aiLab.js, ws.js)
+│       ├── config/          #   配置文件
 │       └── router/          #   路由配置
 ├── receipts-frontend/       # 记账前端（独立应用，JWT 认证）
 ├── deploy/                  # 部署脚本与配置
@@ -47,10 +43,7 @@ MyWeb/
 |----------|------|------|
 | `/api/` | api | 厨房：菜谱/食材/订单/博客/AI对话/会话管理 |
 | `/api/questiongen/` | questions | AI 出题 |
-| `/api/interpretation/` | apps.interpretation | 同声传译服务 |
-| `/api/emoji/` | apps.emoji_generator | 表情包视频生成 |
 | `/receipts/api/` | receipts + accounts | 记账系统 + 用户认证 |
-| `ws/games/gomoku/<room_id>/` | apps.games | 五子棋 WebSocket（通过 Daphne） |
 
 ## 前端路由模块 (frontend/src/router/index.js)
 
@@ -59,10 +52,8 @@ MyWeb/
 | 首页 | `/` | 个人主页 (PortfolioHomeView) |
 | 厨房 | `/kitchen/` | 菜谱浏览/点餐/厨师后台 |
 | 博客 | `/blog/` | 技术博客（独立暗色主题） |
-| AI Lab | `/ai-lab/` | AI 对话/翻译工作室/表情包生成 |
 | 出题 | `/questiongen` | AI 出题系统 |
 | 塔罗 | `/tarot/` | 塔罗占卜 |
-| 游戏 | `/games/` | 游戏大厅 + 五子棋实时对战 |
 
 厨师后台路由需 `meta: { requiresAuth: true, authType: 'chef' }`。
 
@@ -114,7 +105,7 @@ cd receipts-frontend && npm run dev # http://localhost:5174
 
 - **域名**: www.lzqqq.org
 - **连接**: `ssh myserver`
-- **部署脚本**: `deploy/` 目录（deploy.sh, nginx.conf, gunicorn.service, daphne.service 等）
+- **部署脚本**: `deploy/` 目录（deploy.sh, nginx.conf, gunicorn.service 等）
 - **服务器上已有项目和部署脚本**，每次代码更新后需要重新部署
 
 ### 部署流程

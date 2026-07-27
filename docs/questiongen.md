@@ -62,8 +62,8 @@ QuestionGen 是项目中的“刷题/题目生成”子系统，包含：
 - `frontend/src/components/QuestionSkeleton.vue`
   - 加载骨架屏
 
-- `frontend/src/components/AIChatWindow.vue`
-  - 仅在题目“已作答”后出现（浮动按钮 + 可调整大小窗口）
+- `frontend/src/components/QgChatSidebar.vue`
+  - 提供可调整宽度的刷题侧栏，并支持答疑、审核与学习模式
   - SSE 方式请求 `questionApi.getChatStreamConfig(...).url`（`/questions/chat-stream/`）
   - `mode=qa|review`：答疑/审核
   - 审核模式若检测到 `[RECOMMENDATION: DELETE]`，显示“确认删除”，调用 `questionApi.requestDelete`
@@ -183,7 +183,7 @@ QuestionGen 是项目中的“刷题/题目生成”子系统，包含：
 - `frontend/src/views/QuestionGenView.vue`
 - `frontend/src/components/QuestionCard.vue`
 - `frontend/src/components/QuestionSkeleton.vue`
-- `frontend/src/components/AIChatWindow.vue`
+- `frontend/src/components/QgChatSidebar.vue`
 
 ### 后端（Django）
 

@@ -1,3 +1,0 @@
-// Release Extension config
-PRODUCT_BUNDLE_IDENTIFIER = org.lzqqq.interpretation.broadcast
-INFOPLIST_FILE = BroadcastExtension/Info.plist

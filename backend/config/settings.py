@@ -62,7 +62,6 @@ SECURE_PROXY_SSL_HEADER = ('HTTP_X_FORWARDED_PROTO', 'https')
 # Application definition
 
 INSTALLED_APPS = [
-    "daphne",
     "django.contrib.admin",
     "django.contrib.auth",
     "django.contrib.contenttypes",
@@ -70,7 +69,6 @@ INSTALLED_APPS = [
     "django.contrib.messages",
     "django.contrib.staticfiles",
     "django.contrib.sites",
-    "channels",
     "rest_framework",
     "corsheaders",
     "allauth",
@@ -82,12 +80,8 @@ INSTALLED_APPS = [
     "readings",
     "oracle",
     "questions",  # QuestionGen 刷题模块
-    "apps.interpretation",
-    "apps.emoji_generator",
-    "apps.games",
     "accounts",
     "receipts",
-    "credits",
 ]
 
 SITE_ID = 1
@@ -134,22 +128,6 @@ TEMPLATES = [
 
 WSGI_APPLICATION = "config.wsgi.application"
 ASGI_APPLICATION = "config.asgi.application"
-
-# Channels configuration (Redis optional for production)
-REDIS_URL = os.environ.get("REDIS_URL", "")
-if REDIS_URL:
-    CHANNEL_LAYERS = {
-        "default": {
-            "BACKEND": "channels_redis.core.RedisChannelLayer",
-            "CONFIG": {"hosts": [REDIS_URL]},
-        }
-    }
-else:
-    CHANNEL_LAYERS = {
-        "default": {
-            "BACKEND": "channels.layers.InMemoryChannelLayer",
-        }
-    }
 
 
 # Database
@@ -245,9 +223,6 @@ SERPER_API_KEY = os.environ.get('SERPER_API_KEY', '')
 GOOGLE_CSE_API_KEY = os.environ.get('GOOGLE_CSE_API_KEY', '')
 GOOGLE_CSE_CX = os.environ.get('GOOGLE_CSE_CX', '')
 
-# Cerebras API 配置 (用于快速 AI 提取，极速推理)
-CEREBRAS_API_KEY_POOL = os.environ.get('CEREBRAS_API_KEY_POOL', '')
-
 # Fernet encryption key for sensitive fields (API keys stored in DB)
 # Auto-generated on first run and persisted to .env
 FIELD_ENCRYPTION_KEY = os.environ.get('FIELD_ENCRYPTION_KEY', '')
@@ -260,16 +235,8 @@ if not FIELD_ENCRYPTION_KEY:
         _f.write(f"\nFIELD_ENCRYPTION_KEY={FIELD_ENCRYPTION_KEY}\n")
     del _Fernet, _env_path, _f
 
-# Groq API 配置 (用于 Whisper 语音转录，备选 ASR)
-# 用户 key 429 时自动从已注册用户的 key 池中取备用 key
+# Groq API 配置（用于厨房聊天组件的 Whisper 语音转录）
 GROQ_API_KEY = os.environ.get('GROQ_API_KEY', '')
-
-# ASR 引擎选择: "groq" (Groq Whisper) 或 "qwen3" (自部署 Qwen3-ASR，Groq 兜底)
-ASR_PROVIDER = os.environ.get('ASR_PROVIDER', 'groq')
-
-# Qwen3-ASR 配置 (自部署 ASR 模型，ASR_PROVIDER=qwen3 时使用)
-# GPU 服务器需开放 8000 端口，Django 后端通过公网直连
-QWEN3_ASR_BASE_URL = os.environ.get('QWEN3_ASR_BASE_URL', 'http://117.50.218.176:8000')
 
 AUTHENTICATION_BACKENDS = [
     "django.contrib.auth.backends.ModelBackend",
