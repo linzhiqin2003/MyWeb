@@ -67,7 +67,12 @@ npm run build
 echo -e "${YELLOW}🔄 7. 重启服务...${NC}"
 # 游戏模块已下线；清理旧部署中可能仍启用的 Daphne 服务。
 if systemctl list-unit-files daphne.service --no-legend 2>/dev/null | grep -q '^daphne.service'; then
-    sudo systemctl disable --now daphne
+    sudo systemctl disable daphne
+    sudo systemctl stop --no-block daphne || true
+    sleep 2
+    if systemctl is-active --quiet daphne; then
+        sudo systemctl kill --kill-who=all --signal=SIGKILL daphne || true
+    fi
     sudo rm -f /etc/systemd/system/daphne.service
     sudo systemctl daemon-reload
 fi
