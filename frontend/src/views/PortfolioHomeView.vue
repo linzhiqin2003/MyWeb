@@ -30,6 +30,8 @@ onUnmounted(() => {
   if (timer) clearInterval(timer)
 })
 
+const AGENT_URL = 'https://agent.lzqqq.org'
+
 // 导航区块配置
 const navBlocks = [
   {
@@ -42,6 +44,17 @@ const navBlocks = [
     shadowColor: 'shadow-amber-500/30',
     features: ['拟物翻书', '菜谱管理', '订单系统'],
     featured: true
+  },
+  {
+    id: 'agent',
+    title: 'MyAgent',
+    subtitle: 'Hermes Agent Web',
+    description: '基于 Hermes 底座的 Agent Web 应用',
+    href: AGENT_URL,
+    external: true,
+    gradient: 'from-emerald-400 via-teal-500 to-cyan-500',
+    shadowColor: 'shadow-teal-500/30',
+    features: ['Hermes 底座', 'MCP 工具', '技能扩展']
   },
   {
     id: 'questiongen',
@@ -96,6 +109,16 @@ const navigateTo = (path) => {
           {{ currentDate }}
         </div>
         <div class="flex items-center gap-3.5">
+          <a
+            :href="AGENT_URL"
+            class="w-10 h-10 rounded-full bg-gradient-to-br from-emerald-500/20 to-teal-500/20 backdrop-blur-sm flex items-center justify-center hover:from-emerald-500/40 hover:to-teal-500/40 transition-all duration-300 group border border-white/10 hover:border-emerald-400/50"
+            title="MyAgent · Hermes"
+          >
+            <svg class="w-5 h-5 text-white/80 group-hover:text-emerald-300 transition-colors" viewBox="0 0 24 24" fill="currentColor">
+              <path d="M12 1.5l2 5.5 5.5 2-5.5 2-2 5.5-2-5.5L4.5 9l5.5-2 2-5.5z" fill-opacity="0.92"/>
+              <path d="M20 12l.8 2.2 2.2.8-2.2.8-.8 2.2-.8-2.2-2.2-.8 2.2-.8.8-2.2z" fill-opacity="0.5"/>
+            </svg>
+          </a>
           <router-link
             to="/blog"
             class="w-10 h-10 rounded-full bg-gradient-to-br from-violet-500/20 to-purple-500/20 backdrop-blur-sm flex items-center justify-center hover:from-violet-500/40 hover:to-purple-500/40 transition-all duration-300 group border border-white/10 hover:border-violet-400/50"
@@ -152,10 +175,13 @@ const navigateTo = (path) => {
 
           <!-- Bento 网格 -->
           <div class="bento-grid max-w-4xl mx-auto">
-            <button
+            <component
+              :is="block.external ? 'a' : 'button'"
               v-for="(block, idx) in navBlocks"
               :key="block.id"
-              @click="navigateTo(block.path)"
+              :href="block.external ? block.href : undefined"
+              :type="block.external ? undefined : 'button'"
+              @click="!block.external && navigateTo(block.path)"
               class="group relative overflow-hidden rounded-3xl backdrop-blur-xl border border-white/10 text-left transition-all duration-500 hover:scale-[1.02] hover:border-white/20 focus:outline-none focus:ring-2 focus:ring-white/20 bento-card"
               :class="[block.featured ? 'card-featured p-6 sm:p-8' : 'p-5 sm:p-6']"
               :style="{ animationDelay: (idx * 0.08 + 0.1) + 's' }"
@@ -176,6 +202,8 @@ const navigateTo = (path) => {
               <div class="decor-icon" :class="block.featured ? 'decor-lg' : 'decor-sm'">
                 <!-- Kitchen: 叉勺交叉 -->
                 <svg v-if="block.id === 'kitchen'" viewBox="0 0 48 48" fill="currentColor"><path d="M14 4v14c0 2.2 1.8 4 4 4h1v22h2V22h1c2.2 0 4-1.8 4-4V4h-3v12h-2V4h-2v12h-2V4h-3zm20 0c-2 8-4 12-4 18 0 2.2 1.8 4 4 4v18h2V26c2.2 0 4-1.8 4-4 0-6-2-10-4-18h-2z"/></svg>
+                <!-- Agent: 原子轨道 -->
+                <svg v-else-if="block.id === 'agent'" viewBox="0 0 48 48" fill="none" stroke="currentColor" stroke-width="2"><ellipse cx="24" cy="24" rx="20" ry="8" transform="rotate(0 24 24)"/><ellipse cx="24" cy="24" rx="20" ry="8" transform="rotate(60 24 24)"/><ellipse cx="24" cy="24" rx="20" ry="8" transform="rotate(120 24 24)"/><circle cx="24" cy="24" r="3" fill="currentColor"/></svg>
                 <!-- QuestionGen: 灯泡 -->
                 <svg v-else-if="block.id === 'questiongen'" viewBox="0 0 48 48" fill="currentColor"><path d="M24 4C16.3 4 10 10.3 10 18c0 4.8 2.4 9 6 11.6V34a4 4 0 004 4h8a4 4 0 004-4v-4.4c3.6-2.6 6-6.8 6-11.6 0-7.7-6.3-14-14-14zm4 36h-8a2 2 0 010-4h8a2 2 0 010 4z"/></svg>
                 <!-- Tarot: 月亮与星 -->
@@ -194,6 +222,12 @@ const navigateTo = (path) => {
                 >
                   <!-- Kitchen: emoji -->
                   <span v-if="block.id === 'kitchen'" :class="block.featured ? 'text-3xl sm:text-4xl' : 'text-2xl sm:text-3xl'">🍳</span>
+                  <!-- Agent: 多角星火花 -->
+                  <svg v-else-if="block.id === 'agent'" :class="block.featured ? 'w-7 h-7 sm:w-8 sm:h-8' : 'w-6 h-6 sm:w-7 sm:h-7'" viewBox="0 0 24 24" fill="white">
+                    <path d="M12 1.5l2 5.5 5.5 2-5.5 2-2 5.5-2-5.5L4.5 9l5.5-2 2-5.5z" fill-opacity="0.92"/>
+                    <path d="M20 12l.8 2.2 2.2.8-2.2.8-.8 2.2-.8-2.2-2.2-.8 2.2-.8.8-2.2z" fill-opacity="0.5"/>
+                    <path d="M4 17l.5 1.5 1.5.5-1.5.5-.5 1.5-.5-1.5L2 19l1.5-.5.5-1.5z" fill-opacity="0.35"/>
+                  </svg>
                   <!-- QuestionGen: 灯泡 -->
                   <svg v-else-if="block.id === 'questiongen'" :class="block.featured ? 'w-7 h-7 sm:w-8 sm:h-8' : 'w-6 h-6 sm:w-7 sm:h-7'" viewBox="0 0 24 24" fill="none">
                     <path d="M9 21h6m-5-1.5h4M12 3a6 6 0 00-3.5 10.9c.5.5.8 1.2.9 1.8.05.25.2.3.6.3h4c.4 0 .55-.05.6-.3.1-.6.4-1.3.9-1.8A6 6 0 0012 3z" stroke="white" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"/>
@@ -236,7 +270,7 @@ const navigateTo = (path) => {
                   </span>
                 </div>
               </div>
-            </button>
+            </component>
           </div>
         </div>
       </main>
