@@ -1,558 +1,583 @@
 <script setup>
-import { ref, onMounted, onUnmounted } from 'vue'
-import { useRouter } from 'vue-router'
+import { ref, reactive, onMounted, onUnmounted, nextTick } from 'vue'
 
-const router = useRouter()
+/* ══ 可配置区：词表与文案都在这里 ═══════════════════════════════
+   g 决定字体语言：fin=衬线（旧世界） tech=等宽（新世界） life=细体（生活）
+   两个世界的词混在同一片天上，视觉差异本身就把故事讲完了。          */
+const WORDS = [
+  { t: '复利', g: 'fin' }, { t: '风险', g: 'fin' }, { t: '套利', g: 'fin' },
+  { t: '市场', g: 'fin' }, { t: '回测', g: 'fin' }, { t: '波动率', g: 'fin' },
+  { t: 'Alpha', g: 'fin' }, { t: 'Signal', g: 'fin' },
 
-// 当前时间（拆分 时:分 用于冒号闪烁）
-const timeHour = ref('')
-const timeMinute = ref('')
-const currentDate = ref('')
+  { t: 'Agent', g: 'tech' }, { t: '上下文', g: 'tech' }, { t: '推理', g: 'tech' },
+  { t: '并发', g: 'tech' }, { t: '收敛', g: 'tech' }, { t: '泛化', g: 'tech' },
+  { t: 'Context', g: 'tech' }, { t: 'Latency', g: 'tech' },
+  { t: 'Prompt', g: 'tech' }, { t: 'Vector', g: 'tech' },
 
-const updateTime = () => {
-  const now = new Date()
-  timeHour.value = String(now.getHours()).padStart(2, '0')
-  timeMinute.value = String(now.getMinutes()).padStart(2, '0')
-  currentDate.value = now.toLocaleDateString('zh-CN', {
-    weekday: 'long',
-    month: 'long',
-    day: 'numeric'
+  { t: '厨房', g: 'life' }, { t: '塔罗', g: 'life' }, { t: '写作', g: 'life' },
+  { t: '好奇', g: 'life' }, { t: '直觉', g: 'life' }, { t: '咖啡', g: 'life' },
+  { t: 'Kitchen', g: 'life' }, { t: 'Tarot', g: 'life' }, { t: 'Blog', g: 'life' },
+  { t: 'Questions', g: 'life' }, { t: 'Curiosity', g: 'life' },
+  { t: '在路上', g: 'life' }, { t: '深夜', g: 'life' }, { t: 'Sketch', g: 'life' },
+]
+
+const LINES = ['你好，我是 LZQ.', '猛猛干 就是玩。', '技术理想，一直在路上。']
+const SUBS = ['personal site · still walking', '猛猛干 就是玩', 'building small worlds']
+
+const MODULES = [
+  { to: '/kitchen',     label: '私人厨房', cls: 'ms-cook',  dx: -232, dy: -104 },
+  { to: '/blog',        label: '技术博客', cls: 'ms-read',  dx:  232, dy: -104 },
+  { to: '/questiongen', label: '智能题库', cls: 'ms-code',  dx: -268, dy:   16 },
+  { to: '/tarot',       label: '塔罗秘仪', cls: 'ms-tarot', dx:  268, dy:   16 },
+]
+/* ════════════════════════════════════════════════════════════ */
+
+const stageEl = ref(null)
+const fieldEl = ref(null)
+const hubEl = ref(null)
+const spriteEl = ref(null)
+const groundEl = ref(null)
+const centerEl = ref(null)
+
+const typed = ref('')
+const sub = ref('')
+const clock = ref('--:--')
+const hubOpen = ref(false)
+
+// 词云：随机特征只掷一次，位置随视口重算 —— 否则改窗口大小整片词云会换一副样子
+const seeds = WORDS.map((w, i) => {
+  const big = i % 3 === 0
+  const ang = big
+    ? Math.PI * (0.10 + Math.random() * 0.80)      // 大词压在下半当前景
+    : (i / WORDS.length) * Math.PI * 2 + (Math.random() - 0.5) * 0.6
+  const dur = 11 + Math.random() * 8
+  return {
+    ...w, big,
+    ca: Math.cos(ang), sa: Math.sin(ang),
+    f0: (big ? 0.62 : 0.42) + Math.random() * 0.46,
+    sz: Math.random(),
+    peak: big ? (0.20 + Math.random() * 0.12) : (0.44 + Math.random() * 0.2),
+    b0: big ? (4 + Math.random() * 3) : 0,
+    rot: (Math.random() - 0.5) * 11,
+    dur, delay: -Math.random() * dur,
+  }
+})
+const cloud = reactive(seeds.map(s => ({
+  t: s.t, g: s.g, big: s.big,
+  style: {
+    '--peak': s.peak.toFixed(2),
+    '--b0': s.b0.toFixed(0) + 'px',
+    '--rot': s.rot.toFixed(1) + 'deg',
+    animationDuration: s.dur.toFixed(2) + 's',
+    animationDelay: s.delay.toFixed(2) + 's',
+    '--x': '0px', '--y': '0px', fontSize: '16px',
+  },
+})))
+
+function layoutWords () {
+  const el = fieldEl.value
+  if (!el) return
+  // 用 clientWidth 兜底：容器以 0 尺寸完成首次渲染时 innerWidth 可能为 0，
+  // 那样半径全塌成 0，整片词云会堆死在原点。
+  const vw = el.clientWidth || window.innerWidth || 1280
+  const vh = el.clientHeight || window.innerHeight || 720
+  if (!vw || !vh) return
+
+  // 半径与字号都要把透视放大折算进去：起始 z=420、perspective=800，
+  // 屏幕上被放大约 2.1 倍。照半屏宽直接布点，词会整片飞出视野。
+  const PERSP = 800 / (800 - 420)
+  const Rx = vw * 0.52 / PERSP
+  const Ry = vh * 0.50 / PERSP
+  // 禁区按标题实际占的宽度算，不是容器宽度
+  const keepW = Math.min(vw * 0.30, 430)
+  const keepH = 200
+
+  seeds.forEach((s, i) => {
+    let f = s.f0
+    let px = s.ca * Rx * f
+    let py = s.sa * Ry * f
+    // 禁区比的是屏幕上的实际位置，所以要乘回透视放大倍数
+    while (Math.abs(px * PERSP) < keepW && Math.abs(py * PERSP) < keepH && f < 1.35) {
+      f += 0.08; px = s.ca * Rx * f; py = s.sa * Ry * f
+    }
+    const st = cloud[i].style
+    st['--x'] = px.toFixed(0) + 'px'
+    st['--y'] = py.toFixed(0) + 'px'
+    // 字号是折算前的基准值，入场瞬间会被放大到约 2.1 倍
+    st.fontSize = (s.big ? Math.max(34, vw * 0.027) + s.sz * 34
+                         : 12 + s.sz * 14).toFixed(0) + 'px'
   })
 }
 
-let timer = null
-onMounted(() => {
-  updateTime()
-  timer = setInterval(updateTime, 1000)
+/* 人物锚定到背景图中云丘顶面的同一比例点：背景走 cover 缩放，
+   只有复算一遍它的几何，才能保证任何视口比例下他都踩在同一片云上。 */
+const IMG_W = 1536, IMG_H = 1024
+const RIDGE_X = 0.505, RIDGE_Y = 0.60
+const POS_Y = 0.22, INSET_X = 0.07, INSET_Y = 0.05
+
+function placeHub () {
+  const stage = stageEl.value, hub = hubEl.value
+  const sprite = spriteEl.value, ground = groundEl.value, center = centerEl.value
+  if (!stage || !hub || !sprite) return
+
+  const vw = stage.clientWidth, vh = stage.clientHeight
+  const cw = vw * (1 + INSET_X * 2), ch = vh * (1 + INSET_Y * 2)
+  const ox = -vw * INSET_X, oy = -vh * INSET_Y
+
+  const scale = Math.max(cw / IMG_W, ch / IMG_H)          // cover
+  const dw = IMG_W * scale, dh = IMG_H * scale
+
+  const x = ox + (cw - dw) * 0.5 + dw * RIDGE_X
+  const feetY = oy + (ch - dh) * POS_Y + dh * RIDGE_Y
+  const headY = feetY - sprite.offsetHeight
+
+  hub.style.left = x + 'px'
+  hub.style.top = (feetY - hub.offsetHeight) + 'px'
+  ground.style.left = x + 'px'
+  ground.style.top = (feetY - 7) + 'px'
+
+  // 文案排在人物头顶之上。两者若各写各的百分比，矮视口下必然相撞。
+  const bar = parseFloat(getComputedStyle(document.documentElement)
+    .getPropertyValue('--hero-bar')) || 58
+  center.style.top = Math.max(bar + 22, headY - 30 - center.offsetHeight) + 'px'
+}
+
+let closeTimer = null
+const openHub = () => { clearTimeout(closeTimer); hubOpen.value = true }
+// 关闭留 260ms 缓冲，鼠标在人物与分身之间移动时不会闪断
+const closeHub = () => { closeTimer = setTimeout(() => { hubOpen.value = false }, 260) }
+
+let typeTimer = null
+function typewriter () {
+  if (window.matchMedia('(prefers-reduced-motion: reduce)').matches) {
+    typed.value = LINES[0]; sub.value = SUBS[0]; return
+  }
+  let li = 0
+  const TYPE = 68, ERASE = 30, HOLD = 2100
+  const type = (i = 0) => {
+    if (i === 0) sub.value = SUBS[li % SUBS.length]
+    if (i <= LINES[li].length) {
+      typed.value = LINES[li].slice(0, i)
+      typeTimer = setTimeout(() => type(i + 1), TYPE)
+    } else {
+      typeTimer = setTimeout(() => erase(LINES[li].length), HOLD)
+    }
+  }
+  const erase = (i) => {
+    if (i >= 0) {
+      typed.value = LINES[li].slice(0, i)
+      typeTimer = setTimeout(() => erase(i - 1), ERASE)
+    } else {
+      li = (li + 1) % LINES.length
+      typeTimer = setTimeout(() => type(0), 360)
+    }
+  }
+  type()
+}
+
+let clockTimer = null
+let ro = null
+function onParallax (e) {
+  const el = fieldEl.value
+  if (!el) return
+  const dx = e.clientX / window.innerWidth - 0.5
+  const dy = e.clientY / window.innerHeight - 0.5
+  el.style.transform = `translate3d(${(-dx * 26).toFixed(1)}px, ${(-dy * 18).toFixed(1)}px, 0)`
+}
+
+function relayout () { layoutWords(); placeHub() }
+
+onMounted(async () => {
+  await nextTick()
+  relayout()
+  window.addEventListener('resize', relayout)
+  window.addEventListener('load', relayout)
+  // 容器尺寸未必随窗口变化（分栏、预览面板），直接盯容器本身
+  if (window.ResizeObserver && fieldEl.value) {
+    ro = new ResizeObserver(relayout); ro.observe(fieldEl.value)
+  }
+  if (!window.matchMedia('(prefers-reduced-motion: reduce)').matches) {
+    window.addEventListener('mousemove', onParallax, { passive: true })
+  }
+  typewriter()
+  const tick = () => {
+    const d = new Date()
+    clock.value = String(d.getHours()).padStart(2, '0') + ':' +
+                  String(d.getMinutes()).padStart(2, '0')
+  }
+  tick(); clockTimer = setInterval(tick, 20000)
 })
 
 onUnmounted(() => {
-  if (timer) clearInterval(timer)
+  window.removeEventListener('resize', relayout)
+  window.removeEventListener('load', relayout)
+  window.removeEventListener('mousemove', onParallax)
+  clearTimeout(typeTimer); clearTimeout(closeTimer); clearInterval(clockTimer)
+  if (ro) ro.disconnect()
 })
-
-// 导航区块配置
-const navBlocks = [
-  {
-    id: 'kitchen',
-    title: '私人厨房',
-    subtitle: 'Kitchen Book',
-    description: '私人菜谱收藏，记录美食制作方法',
-    path: '/kitchen',
-    gradient: 'from-orange-400 via-amber-500 to-yellow-500',
-    shadowColor: 'shadow-amber-500/30',
-    features: ['拟物翻书', '菜谱管理', '订单系统'],
-    featured: true
-  },
-  {
-    id: 'questiongen',
-    title: '智能刷题',
-    subtitle: 'Question Gen',
-    description: 'AI驱动的智能学习工具',
-    path: '/questiongen',
-    gradient: 'from-cyan-500 via-blue-500 to-indigo-500',
-    shadowColor: 'shadow-blue-500/30',
-    features: ['AI出题', '知识巩固']
-  },
-  {
-    id: 'tarot',
-    title: '塔罗秘仪',
-    subtitle: 'Tarot Sanctum',
-    description: '沉浸式占卜与神秘解读体验',
-    path: '/tarot',
-    gradient: 'from-violet-500 via-purple-500 to-indigo-500',
-    shadowColor: 'shadow-purple-500/30',
-    features: ['互动牌阵', 'AI解读']
-  }
-]
-
-const navigateTo = (path) => {
-  router.push(path)
-}
 </script>
 
 <template>
-  <div class="min-h-screen bg-gradient-to-br from-slate-900 via-slate-800 to-slate-900 text-white overflow-hidden home-shell">
-    <!-- 动态背景 -->
-    <div class="fixed inset-0 pointer-events-none overflow-hidden">
-      <div class="orb orb-1"></div>
-      <div class="orb orb-2"></div>
-      <div class="orb orb-3"></div>
-      <div class="orb orb-4"></div>
-      <div class="particle particle-1"></div>
-      <div class="particle particle-2"></div>
-      <div class="particle particle-3"></div>
-      <div class="particle particle-4"></div>
-      <div class="particle particle-5"></div>
-      <div class="particle particle-6"></div>
-      <div class="absolute inset-0 bg-[linear-gradient(rgba(255,255,255,0.015)_1px,transparent_1px),linear-gradient(90deg,rgba(255,255,255,0.015)_1px,transparent_1px)] bg-[size:60px_60px]"></div>
-      <div class="absolute inset-x-0 top-0 h-40 bg-gradient-to-b from-slate-900/50 to-transparent"></div>
-      <div class="absolute inset-x-0 bottom-0 h-40 bg-gradient-to-t from-slate-900/50 to-transparent"></div>
+  <div class="stage" ref="stageEl" :class="{ 'hub-open': hubOpen }">
+    <div class="cloud-back"></div>
+    <div class="band band-high"></div>
+    <div class="band band-low"></div>
+    <div class="glow"></div>
+
+    <div class="field" ref="fieldEl">
+      <span
+        v-for="(w, i) in cloud" :key="i"
+        class="word" :class="['g-' + w.g, { soft: w.big }]"
+        :style="w.style"
+      >{{ w.t }}</span>
     </div>
 
-    <div class="relative min-h-screen flex flex-col">
-      <!-- 顶部状态栏 -->
-      <header class="pt-safe px-6 py-4 flex items-center justify-between">
-        <div class="text-base text-white/60 font-medium">
-          {{ currentDate }}
-        </div>
-        <div class="flex items-center gap-3.5">
-          <router-link
-            to="/blog"
-            class="w-10 h-10 rounded-full bg-gradient-to-br from-violet-500/20 to-purple-500/20 backdrop-blur-sm flex items-center justify-center hover:from-violet-500/40 hover:to-purple-500/40 transition-all duration-300 group border border-white/10 hover:border-violet-400/50"
-            title="技术博客"
-          >
-            <svg class="w-5 h-5 text-white/80 group-hover:text-violet-300 transition-colors" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z"/>
-            </svg>
-          </router-link>
-          <a
-            href="https://github.com/linzhiqin2003"
-            target="_blank"
-            class="w-10 h-10 rounded-full bg-white/10 backdrop-blur-sm flex items-center justify-center hover:bg-white/20 transition-colors border border-white/10 hover:border-white/30"
-            title="GitHub"
-          >
-            <svg class="w-5 h-5 text-white/80" fill="currentColor" viewBox="0 0 24 24">
-              <path d="M12 0c-6.626 0-12 5.373-12 12 0 5.302 3.438 9.8 8.207 11.387.599.111.793-.261.793-.577v-2.234c-3.338.726-4.033-1.416-4.033-1.416-.546-1.387-1.333-1.756-1.333-1.756-1.089-.745.083-.729.083-.729 1.205.084 1.839 1.237 1.839 1.237 1.07 1.834 2.807 1.304 3.492.997.107-.775.418-1.305.762-1.604-2.665-.305-5.467-1.334-5.467-5.931 0-1.311.469-2.381 1.236-3.221-.124-.303-.535-1.524.117-3.176 0 0 1.008-.322 3.301 1.23.957-.266 1.983-.399 3.003-.404 1.02.005 2.047.138 3.006.404 2.291-1.552 3.297-1.23 3.297-1.23.653 1.653.242 2.874.118 3.176.77.84 1.235 1.911 1.235 3.221 0 4.609-2.807 5.624-5.479 5.921.43.372.823 1.102.823 2.222v3.293c0 .319.192.694.801.576 4.765-1.589 8.199-6.086 8.199-11.386 0-6.627-5.373-12-12-12z"/>
-            </svg>
-          </a>
-        </div>
-      </header>
+    <div class="vignette"></div>
+    <div class="ground" ref="groundEl"></div>
 
-      <!-- 主内容 -->
-      <main class="flex-1 px-4 sm:px-6 lg:px-8 pb-8">
-        <div class="max-w-5xl mx-auto">
-          <!-- Hero区域 -->
-          <div class="hero-section text-center pt-8 sm:pt-12 pb-10 sm:pb-14">
-            <!-- 头像（呼吸光环） -->
-            <div class="relative inline-block mb-5">
-              <div class="avatar-glow"></div>
-              <div class="w-24 h-24 sm:w-28 sm:h-28 rounded-[1.75rem] bg-gradient-to-br from-violet-500 via-purple-500 to-fuchsia-500 p-[3px] shadow-2xl shadow-purple-500/25 relative z-10">
-                <div class="w-full h-full rounded-[1.55rem] bg-slate-800 overflow-hidden">
-                  <img src="/avatar.jpg" alt="avatar" class="w-full h-full object-cover" />
-                </div>
-              </div>
-              <div class="absolute bottom-0.5 right-0.5 w-5 h-5 rounded-full bg-emerald-500 border-[3px] border-slate-900 z-20"></div>
-            </div>
+    <div
+      class="hub" ref="hubEl"
+      @mouseenter="openHub" @mouseleave="closeHub"
+      @focusin="openHub" @focusout="closeHub"
+    >
+      <div class="hero-sprite" ref="spriteEl"></div>
+      <div class="modules">
+        <router-link
+          v-for="m in MODULES" :key="m.to"
+          class="mod" :to="m.to"
+          :style="{ '--dx': m.dx + 'px', '--dy': m.dy + 'px' }"
+        >
+          <span class="mod-sprite" :class="m.cls"></span>
+          <span class="mod-label">{{ m.label }}</span>
+        </router-link>
+      </div>
+    </div>
 
-            <!-- 时间（冒号闪烁） -->
-            <div class="mb-4">
-              <div class="text-5xl sm:text-6xl lg:text-7xl font-extralight tracking-tight text-white/90 mb-1 tabular-nums">
-                <span>{{ timeHour }}</span><span class="colon-blink">:</span><span>{{ timeMinute }}</span>
-              </div>
-            </div>
+    <div class="bar top">
+      <span>lzqqq.org</span>
+      <nav>
+        <router-link to="/kitchen">厨房</router-link>
+        <router-link to="/blog">博客</router-link>
+        <router-link to="/questiongen">题库</router-link>
+        <router-link to="/tarot">塔罗</router-link>
+        <a href="https://github.com/linzhiqin2003" target="_blank" rel="noopener">GitHub</a>
+      </nav>
+    </div>
 
-            <!-- 名称和标语 -->
-            <h1 class="text-2xl sm:text-3xl lg:text-4xl font-bold mb-3 bg-clip-text text-transparent bg-gradient-to-r from-white via-white to-white/80">
-              LZQ 的个人空间
-            </h1>
-            <p class="text-base sm:text-lg text-white/45 max-w-sm mx-auto leading-relaxed">
-              猛猛干 就是玩
-            </p>
-          </div>
+    <div class="center" ref="centerEl">
+      <div class="line"><span>{{ typed }}</span><span class="caret"></span></div>
+      <div class="sub">{{ sub }}</div>
+    </div>
 
-          <!-- Bento 网格 -->
-          <div class="bento-grid max-w-4xl mx-auto">
-            <button
-              v-for="(block, idx) in navBlocks"
-              :key="block.id"
-              @click="navigateTo(block.path)"
-              class="group relative overflow-hidden rounded-3xl backdrop-blur-xl border border-white/10 text-left transition-all duration-500 hover:scale-[1.02] hover:border-white/20 focus:outline-none focus:ring-2 focus:ring-white/20 bento-card"
-              :class="[block.featured ? 'card-featured p-6 sm:p-8' : 'p-5 sm:p-6']"
-              :style="{ animationDelay: (idx * 0.08 + 0.1) + 's' }"
-            >
-              <!-- Hover 渐变背景 -->
-              <div
-                class="absolute inset-0 bg-gradient-to-br opacity-[0.05] group-hover:opacity-[0.12] transition-opacity duration-500"
-                :class="block.gradient"
-              ></div>
+    <div class="scroll"></div>
 
-              <!-- Hover 角落光效 -->
-              <div class="absolute top-0 right-0 w-40 h-40 bg-gradient-to-br from-white/[0.03] to-transparent rounded-bl-full opacity-0 group-hover:opacity-100 transition-opacity duration-500"></div>
-
-              <!-- 厨房卡片装饰图案 -->
-              <div v-if="block.featured" class="kitchen-decor-pattern"></div>
-
-              <!-- 右下角装饰 SVG -->
-              <div class="decor-icon" :class="block.featured ? 'decor-lg' : 'decor-sm'">
-                <!-- Kitchen: 叉勺交叉 -->
-                <svg v-if="block.id === 'kitchen'" viewBox="0 0 48 48" fill="currentColor"><path d="M14 4v14c0 2.2 1.8 4 4 4h1v22h2V22h1c2.2 0 4-1.8 4-4V4h-3v12h-2V4h-2v12h-2V4h-3zm20 0c-2 8-4 12-4 18 0 2.2 1.8 4 4 4v18h2V26c2.2 0 4-1.8 4-4 0-6-2-10-4-18h-2z"/></svg>
-                <!-- QuestionGen: 灯泡 -->
-                <svg v-else-if="block.id === 'questiongen'" viewBox="0 0 48 48" fill="currentColor"><path d="M24 4C16.3 4 10 10.3 10 18c0 4.8 2.4 9 6 11.6V34a4 4 0 004 4h8a4 4 0 004-4v-4.4c3.6-2.6 6-6.8 6-11.6 0-7.7-6.3-14-14-14zm4 36h-8a2 2 0 010-4h8a2 2 0 010 4z"/></svg>
-                <!-- Tarot: 月亮与星 -->
-                <svg v-else-if="block.id === 'tarot'" viewBox="0 0 48 48" fill="currentColor"><path d="M36 28.6A16 16 0 1119.4 12 12.5 12.5 0 0036 28.6z"/><path d="M38 8l1.2 3.6L43 13l-3.8 1.4L38 18l-1.2-3.6L33 13l3.8-1.4z" opacity="0.7"/></svg>
-              </div>
-
-              <div class="relative z-10">
-                <!-- 图标 -->
-                <div
-                  class="rounded-2xl bg-gradient-to-br flex items-center justify-center mb-4 shadow-lg transition-transform duration-500 group-hover:scale-110 group-hover:rotate-3"
-                  :class="[
-                    block.gradient,
-                    block.shadowColor,
-                    block.featured ? 'w-14 h-14 sm:w-16 sm:h-16' : 'w-12 h-12 sm:w-14 sm:h-14'
-                  ]"
-                >
-                  <!-- Kitchen: emoji -->
-                  <span v-if="block.id === 'kitchen'" :class="block.featured ? 'text-3xl sm:text-4xl' : 'text-2xl sm:text-3xl'">🍳</span>
-                  <!-- QuestionGen: 灯泡 -->
-                  <svg v-else-if="block.id === 'questiongen'" :class="block.featured ? 'w-7 h-7 sm:w-8 sm:h-8' : 'w-6 h-6 sm:w-7 sm:h-7'" viewBox="0 0 24 24" fill="none">
-                    <path d="M9 21h6m-5-1.5h4M12 3a6 6 0 00-3.5 10.9c.5.5.8 1.2.9 1.8.05.25.2.3.6.3h4c.4 0 .55-.05.6-.3.1-.6.4-1.3.9-1.8A6 6 0 0012 3z" stroke="white" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"/>
-                    <path d="M12 3v1.5m6 .5l-1 1M21 10.5h-1.5m-13 0H5m2.5-5l-1-1" stroke="white" stroke-width="1.2" stroke-linecap="round" opacity="0.45"/>
-                  </svg>
-                  <!-- Tarot: 全视之眼 -->
-                  <svg v-else-if="block.id === 'tarot'" :class="block.featured ? 'w-7 h-7 sm:w-8 sm:h-8' : 'w-6 h-6 sm:w-7 sm:h-7'" viewBox="0 0 24 24" fill="white">
-                    <path d="M12 5C6 5 1.5 12 1.5 12S6 19 12 19s10.5-7 10.5-7S18 5 12 5z" fill-opacity="0.2"/>
-                    <path d="M12 5C6 5 1.5 12 1.5 12S6 19 12 19s10.5-7 10.5-7S18 5 12 5zm0 11a4 4 0 110-8 4 4 0 010 8z" fill-opacity="0.85"/>
-                    <circle cx="12" cy="12" r="1.8" fill-opacity="0.95"/>
-                  </svg>
-                </div>
-
-                <!-- 标题 -->
-                <div class="mb-2">
-                  <h2
-                    class="font-bold text-white mb-0.5"
-                    :class="block.featured ? 'text-xl sm:text-2xl' : 'text-lg sm:text-xl'"
-                  >
-                    {{ block.title }}
-                  </h2>
-                  <p class="text-[11px] font-medium text-white/35 uppercase tracking-wider">
-                    {{ block.subtitle }}
-                  </p>
-                </div>
-
-                <!-- 描述 -->
-                <p class="text-sm text-white/55 mb-4 leading-relaxed">
-                  {{ block.description }}
-                </p>
-
-                <!-- 特性标签 -->
-                <div class="flex flex-wrap gap-2">
-                  <span
-                    v-for="feature in block.features"
-                    :key="feature"
-                    class="px-2.5 py-1 text-xs font-medium rounded-full bg-white/[0.08] text-white/60 border border-white/[0.06]"
-                  >
-                    {{ feature }}
-                  </span>
-                </div>
-              </div>
-            </button>
-          </div>
-        </div>
-      </main>
-
-      <!-- 底部 -->
-      <footer class="px-6 py-6 text-center">
-        <div class="flex items-center justify-center gap-2 text-sm text-white/30">
-          <span>Built with</span>
-          <span class="text-red-400">&#10084;&#65039;</span>
-          <span>by LZQ</span>
-          <span class="mx-2">&middot;</span>
-          <span>&copy; 2025</span>
-        </div>
-      </footer>
+    <div class="bar bottom">
+      <div class="slate">
+        <span>LOCATION: <b>在路上</b></span>
+        <span class="hide-sm">TIME: <b>{{ clock }}</b></span>
+      </div>
+      <div class="slate">
+        <span class="hide-sm">FRAMES: <b>&infin;</b></span>
+        <span>MEMORY: <b>IN PROGRESS</b></span>
+      </div>
     </div>
   </div>
 </template>
 
 <style scoped>
-/* ========== Typography overrides — refined font stack on the dark layout ========== */
-.home-shell {
-  font-family: 'Geist', ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, 'Helvetica Neue', sans-serif;
-  font-feature-settings: 'cv11', 'ss01';
-  letter-spacing: -0.005em;
-}
-.home-shell h1, .home-shell h2 {
-  font-family: 'Bricolage Grotesque', 'Geist', ui-sans-serif, system-ui, sans-serif;
-  letter-spacing: -0.022em;
-  font-variation-settings: 'opsz' 60;
-}
-.home-shell .tabular-nums {
-  font-family: 'Geist Mono', ui-monospace, SFMono-Regular, Menlo, Monaco, monospace;
-  font-feature-settings: 'tnum', 'zero';
-  letter-spacing: -0.02em;
-}
-/* tiny mono labels (subtitle under each card title) */
-.home-shell .uppercase.tracking-wider {
-  font-family: 'Geist Mono', ui-monospace, SFMono-Regular, Menlo, monospace;
-  letter-spacing: 0.12em !important;
+.stage{
+  --sky-1:#c8dff6; --sky-2:#e2eefa; --sky-3:#fbfdff;
+  --ink:#1b2836; --ink-soft:#42586e; --muted:#8399ac;
+  --band:#f7fafd; --hero-bar:58px;
+  --mono:"Geist Mono",ui-monospace,SFMono-Regular,Menlo,monospace;
+  --sans:"Noto Sans SC","Inter",system-ui,sans-serif;
+
+  position:relative; height:100vh; min-height:600px; overflow:hidden;
+  font-family:var(--sans); color:var(--ink);
+  background:linear-gradient(180deg,var(--sky-1) 0%,var(--sky-2) 46%,var(--sky-3) 100%);
 }
 
-/* ========== Hero ========== */
-.hero-section {
-  animation: heroIn 0.7s ease-out;
+/* 云海背景：真实体积云。纯 CSS 渐变画不出体积，这是画面质感的来源。
+   定位 22% 而非居中 —— cover 会裁掉上下，必须优先保住上部的天空和地平线。 */
+.cloud-back{
+  position:absolute; inset:-5% -7%;
+  background:url("/sprites/cloud-bg.webp") center 22%/cover no-repeat;
+  will-change:transform;
+  animation:sway-back 96s ease-in-out infinite alternate;
+}
+@keyframes sway-back{
+  from{transform:translate3d(-1.4%,0,0) scale(1.03)}
+  to  {transform:translate3d( 1.4%,0,0) scale(1.07)}
 }
 
-@keyframes heroIn {
-  from { opacity: 0; transform: translateY(16px); }
+/* 流动云带：人物脚下那片云不能动（他站着），会动的是空中飘过的云。
+   用 transform 而非 background-position —— 后者不是合成属性，每帧都要重绘。
+   贴图是镜像拼接的，平移一个贴图宽即无缝闭环。 */
+.band{
+  position:absolute; left:0; pointer-events:none;
+  background-repeat:repeat-x; background-position-y:center;
+  will-change:transform;
+}
+.band-high{
+  top:6%; height:190px; z-index:1; opacity:.85;
+  width:calc(100% + 1560px);
+  background-image:url("/sprites/band-high.webp"); background-size:1560px auto;
+  animation:flow-high 210s linear infinite;
+}
+@keyframes flow-high{
+  from{transform:translate3d(0,0,0)} to{transform:translate3d(-1560px,0,0)}
+}
+.band-low{
+  top:34%; height:230px; z-index:2; opacity:.72;
+  width:calc(100% + 1820px);
+  background-image:url("/sprites/band-low.webp"); background-size:1820px auto;
+  animation:flow-low 128s linear infinite;
+}
+@keyframes flow-low{
+  from{transform:translate3d(0,0,0)} to{transform:translate3d(-1820px,0,0)}
 }
 
-/* 头像呼吸光环 */
-.avatar-glow {
-  position: absolute;
-  inset: -6px;
-  border-radius: 2rem;
-  background: linear-gradient(135deg, #a855f7, #7c3aed, #d946ef);
-  opacity: 0.35;
-  filter: blur(14px);
-  z-index: 0;
-  animation: breatheGlow 3s ease-in-out infinite;
+.glow{
+  position:absolute; left:50%; top:-14%; width:70vw; height:52vh;
+  transform:translateX(-50%); pointer-events:none;
+  background:radial-gradient(closest-side,rgba(255,255,255,.9),rgba(255,255,255,0));
+}
+.vignette{
+  position:absolute; inset:0; pointer-events:none;
+  background:radial-gradient(120% 90% at 50% 45%,rgba(255,255,255,0) 55%,rgba(120,150,180,.14) 100%);
 }
 
-@keyframes breatheGlow {
-  0%, 100% { opacity: 0.25; transform: scale(1); }
-  50% { opacity: 0.55; transform: scale(1.08); }
+/* ───────── 词云：3D 汇聚 ───────── */
+.field{
+  position:absolute; inset:0; pointer-events:none;
+  /* perspective 越小透视越强。配合更大的 z 行程，词从 2.1 倍缩到 0.35 倍，
+     整整六倍的尺寸变化，「由远及近」才真的读得出来。 */
+  perspective:800px; perspective-origin:50% 46%;
+  transition:transform .5s cubic-bezier(.22,1,.36,1), opacity .4s ease;
+}
+.word{
+  position:absolute; left:50%; top:46%;
+  font-weight:400; white-space:nowrap; opacity:0;
+  /* 云海是高频背景，纯文字会被吃掉；一圈白光晕把字从云里托出来 */
+  text-shadow:0 0 14px rgba(255,255,255,.7), 0 0 4px rgba(255,255,255,.5);
+  --peak:.5; --b0:0px; --rot:0deg;
+  will-change:transform,opacity;
+  animation-name:converge; animation-timing-function:linear;
+  animation-iteration-count:infinite;
+}
+/* 三类词各有字体语言，视觉差异直接承载语义 */
+.g-fin { font-family:"Noto Serif SC",Georgia,serif; color:#5b6d80; letter-spacing:.02em }
+.g-tech{ font-family:"Geist Mono",ui-monospace,"Noto Sans SC",monospace;
+         color:#3f5f7e; letter-spacing:.09em }
+.g-life{ font-family:var(--sans); font-weight:200; color:#74838f; letter-spacing:.06em }
+/* 只有背景层的大词才建滤镜层。模糊写成静态而非逐帧变化的变量：
+   模糊值一旦每帧重算就是整页最贵的开销；而 blur(0) 同样会建层，
+   所以小词干脆不带 filter 这条声明。 */
+.word.soft{ filter:blur(var(--b0)) }
+
+@keyframes converge{
+  0%   {transform:translate3d(var(--x),var(--y),420px) rotate(var(--rot)); opacity:0}
+  10%  {opacity:var(--peak)}
+  /* 中间这帧是关键：前 45% 的时间只走完四分之一深度，词在「大」的状态
+     停留得够久，由大变小才看得出来；剩下 55% 冲完全程，收尾干脆。 */
+  45%  {transform:translate3d(calc(var(--x)*.84),calc(var(--y)*.84),40px)
+                  rotate(calc(var(--rot) * .45));
+        opacity:calc(var(--peak) * .8)}
+  80%  {opacity:.09}
+  100% {transform:translate3d(calc(var(--x)*.5),calc(var(--y)*.5),-1500px)
+                 rotate(calc(var(--rot) * -.5)); opacity:0}
 }
 
-/* 冒号闪烁 */
-.colon-blink {
-  animation: blinkColon 1s step-end infinite;
+/* ───────── 中心文案 ───────── */
+.center{
+  position:absolute; left:50%; top:26%; transform:translateX(-50%);
+  width:min(94vw,1040px); text-align:center; z-index:3;
+  /* 纯展示，必须让出鼠标：它有 1040px 宽、排在 hub 之后，
+     否则会盖住分身上半部分，鼠标看着在分身上、实际命中的是这层。 */
+  pointer-events:none;
+  transition:opacity .4s ease;
+}
+.center::before{
+  content:""; position:absolute; left:50%; top:36%;
+  width:112%; height:150%; transform:translate(-50%,-50%);
+  background:radial-gradient(closest-side,rgba(255,255,255,.52),rgba(255,255,255,0) 72%);
+  pointer-events:none; z-index:-1;
+}
+.line{
+  font-family:var(--mono); font-size:clamp(24px,4.4vw,64px); font-weight:500;
+  letter-spacing:.01em; min-height:1.4em; color:var(--ink);
+}
+.caret{
+  display:inline-block; width:.56em; height:1.02em; margin-left:.06em;
+  background:var(--ink); vertical-align:-.16em;
+  animation:caret 1.05s steps(1) infinite;
+}
+@keyframes caret{0%,50%{opacity:1}51%,100%{opacity:0}}
+.sub{
+  margin-top:16px; font-family:var(--mono); font-size:clamp(11px,1.05vw,15px);
+  letter-spacing:.24em; color:var(--muted); text-transform:uppercase;
+  min-height:1.4em;
 }
 
-@keyframes blinkColon {
-  0%, 100% { opacity: 1; }
-  50% { opacity: 0; }
+/* ───────── 人物与分身 ───────── */
+.hub{
+  position:absolute; z-index:3;
+  width:820px; height:330px; margin-left:-410px;
+  display:flex; align-items:flex-end; justify-content:center;
+}
+/* 展开后把命中区外扩一圈：鼠标在分身之间游走、或略微越界都不会误判为离开。
+   收起时不启用，否则鼠标只是路过附近就会把分身弹出来。
+   用 ::before 而非 ::after —— 前者绘制在内容之下，不会挡住分身的点击。 */
+.hub::before{
+  content:""; position:absolute; inset:-40px -64px -34px; pointer-events:none;
+}
+.hub-open .hub::before{ pointer-events:auto }
+
+.hero-sprite{
+  /* 高度跟视口走：矮屏上固定高度会把人物撑得过大、挤掉文案的位置 */
+  --h:clamp(104px, 19vh, 176px); --fw:137; --fh:256; --n:3;
+  position:relative; z-index:2;
+  width:calc(var(--h) * var(--fw) / var(--fh)); height:var(--h);
+  background-image:url("/sprites/core.png"); background-repeat:no-repeat;
+  background-size:calc(var(--h) * var(--fw) * var(--n) / var(--fh)) auto;
+  image-rendering:pixelated; transform-origin:bottom center; cursor:pointer;
+  animation:blink 5.4s steps(1) infinite, breathe 3.8s ease-in-out infinite;
+}
+/* 眨眼只切 background-position，呼吸只改 transform，两条轨道互不干扰 */
+@keyframes blink{
+  0%,93%    {background-position:0 0}
+  94%,96.4% {background-position:calc(-1 * var(--h) * var(--fw) / var(--fh)) 0}
+  97%,100%  {background-position:0 0}
+}
+@keyframes breathe{
+  0%,100%{transform:scaleY(1)} 50%{transform:scaleY(.988)}
+}
+.hero-sprite:hover{
+  background-position:calc(-2 * var(--h) * var(--fw) / var(--fh)) 0 !important;
+  animation:breathe 3.8s ease-in-out infinite;
+}
+.ground{
+  position:absolute; left:50%; z-index:2;
+  width:112px; height:12px; margin-left:-56px; border-radius:50%;
+  background:radial-gradient(closest-side,rgba(96,130,166,.24),rgba(96,130,166,0));
 }
 
-.tabular-nums {
-  font-variant-numeric: tabular-nums;
+/* 焦点转移：分身展开时背景整体退后，模块自然浮到前景 —— 用景深换层级，
+   比给分身加边框色块干净。只降透明度不加 blur：对装着 32 个动画元素的
+   容器做模糊，等于每帧把整层重新光栅化。 */
+.hub-open .field { opacity:.16 }
+.hub-open .center{ opacity:.34 }
+.cloud-back{ transition:opacity .5s ease }
+.hub-open .cloud-back{ opacity:.9 }
+
+/* ───────── 模块入口：他的分身 ─────────
+   四个分身从本体分裂出去，各自做对应模块的事。
+   用动作说明模块，比挂四个文字标签直观。 */
+.modules{ position:absolute; inset:0; pointer-events:none }
+.mod{
+  position:absolute; left:50%; bottom:14px;
+  display:flex; flex-direction:column; align-items:center; gap:6px;
+  text-decoration:none; white-space:nowrap;
+  /* 收起态：缩成一点藏在本体身上，展开就是「分裂」 */
+  transform:translate(-50%,0) scale(.28);
+  opacity:0; pointer-events:none;
+  transition:transform .52s cubic-bezier(.34,1.32,.5,1), opacity .34s ease;
+}
+.hub-open .mod{
+  transform:translate(calc(-50% + var(--dx)), var(--dy)) scale(1);
+  opacity:1; pointer-events:auto;
+}
+/* 依次浮现，比齐刷刷弹出更有生气 */
+.hub-open .mod:nth-child(1){ transition-delay:0s,    0s }
+.hub-open .mod:nth-child(2){ transition-delay:.055s, .055s }
+.hub-open .mod:nth-child(3){ transition-delay:.11s,  .11s }
+.hub-open .mod:nth-child(4){ transition-delay:.165s, .165s }
+
+.mod-sprite{
+  --h:96px; position:relative;
+  width:calc(var(--h) * var(--fw) / var(--fh)); height:var(--h);
+  background-repeat:no-repeat; image-rendering:pixelated;
+  background-size:calc(var(--h) * var(--fw) * var(--n) / var(--fh)) auto;
+  transition:transform .22s ease;
+  animation-play-state:paused;      /* 收起时分身不可见，动画不必空转 */
+}
+.hub-open .mod-sprite{ animation-play-state:running }
+.mod-sprite::after{                 /* 脚下小投影，避免看起来浮空 */
+  content:""; position:absolute; left:50%; bottom:0; width:46px; height:7px;
+  transform:translateX(-50%); border-radius:50%;
+  background:radial-gradient(closest-side,rgba(96,130,166,.3),rgba(96,130,166,0));
+}
+.mod-label{
+  font-family:var(--mono); font-size:12px; font-weight:500; letter-spacing:.1em;
+  color:var(--ink); opacity:.72;
+  text-shadow:0 0 14px #fff, 0 0 6px #fff;
+  transition:opacity .2s ease;
+}
+.mod:hover .mod-sprite{ transform:translateY(-5px) }
+.mod:hover .mod-label{ opacity:1 }
+
+/* 每个分身的雪碧图参数。前两帧构成循环动作，第三帧是收尾姿势，只播前两帧 */
+.ms-cook { --fw:144; --fh:200; --n:3; background-image:url("/sprites/cook.png");
+           animation:play2-cook .78s steps(2) infinite }
+.ms-read { --fw:140; --fh:200; --n:3; background-image:url("/sprites/read.png");
+           animation:play2-read 1.15s steps(2) infinite }
+.ms-code { --fw:159; --fh:200; --n:3; background-image:url("/sprites/code.png");
+           animation:play2-code .5s steps(2) infinite }
+.ms-tarot{ --fw:130; --fh:200; --n:3; background-image:url("/sprites/tarot.png");
+           animation:play3-tarot 2.7s steps(3) infinite }
+@keyframes play2-cook { from{background-position:0 0}
+  to{background-position:calc(-2 * var(--h) * var(--fw) / var(--fh)) 0} }
+@keyframes play2-read { from{background-position:0 0}
+  to{background-position:calc(-2 * var(--h) * var(--fw) / var(--fh)) 0} }
+@keyframes play2-code { from{background-position:0 0}
+  to{background-position:calc(-2 * var(--h) * var(--fw) / var(--fh)) 0} }
+@keyframes play3-tarot{ from{background-position:0 0}
+  to{background-position:calc(-3 * var(--h) * var(--fw) / var(--fh)) 0} }
+
+/* ───────── 电影 chrome ───────── */
+.bar{
+  position:absolute; left:0; right:0; height:var(--hero-bar); z-index:5;
+  display:flex; align-items:center; justify-content:space-between;
+  padding:0 26px; background:var(--band);
+  font-family:var(--mono); font-size:11px; letter-spacing:.16em;
+  color:var(--muted); text-transform:uppercase;
+}
+.bar.top{ top:0; border-bottom:1px solid rgba(120,150,180,.14) }
+.bar.bottom{ bottom:0; border-top:1px solid rgba(120,150,180,.14) }
+.bar nav{ display:flex; gap:26px }
+.bar a{ color:var(--muted); text-decoration:none; transition:color .18s }
+.bar a:hover{ color:var(--ink) }
+.slate{ display:flex; gap:22px }
+.slate b{ font-weight:400; color:var(--ink-soft) }
+
+/* 滚动提示：一条细线里有个缓慢下滑的点，不用脉冲呼吸灯 */
+.scroll{
+  position:absolute; left:50%; bottom:calc(var(--hero-bar) + 26px);
+  transform:translateX(-50%);
+  width:1px; height:46px; background:rgba(120,150,180,.28); z-index:4;
+}
+.scroll::after{
+  content:""; position:absolute; left:-2px; top:0; width:5px; height:5px;
+  border-radius:50%; background:var(--ink-soft);
+  animation:fall 2.6s cubic-bezier(.4,0,.5,1) infinite;
+}
+@keyframes fall{
+  0%{transform:translateY(0);opacity:0}
+  22%{opacity:.85} 75%{opacity:.85}
+  100%{transform:translateY(41px);opacity:0}
 }
 
-/* ========== Bento Grid ========== */
-.bento-grid {
-  display: grid;
-  grid-template-columns: repeat(3, 1fr);
-  gap: 1rem;
+@media (max-width:640px){
+  .stage{ --hero-bar:38px }
+  .hero-sprite{ --h:96px }
+  .slate{ gap:12px }
+  .slate .hide-sm{ display:none }
+  .bar nav{ gap:16px }
 }
-
-.card-featured {
-  grid-column: span 2;
-}
-
-@media (max-width: 1024px) {
-  .bento-grid {
-    grid-template-columns: repeat(2, 1fr);
-  }
-  .card-featured {
-    grid-column: span 2;
-  }
-}
-
-@media (max-width: 640px) {
-  .bento-grid {
-    grid-template-columns: 1fr;
-  }
-  .card-featured {
-    grid-column: span 1;
-  }
-}
-
-/* ========== Bento Card ========== */
-.bento-card {
-  background: rgba(255, 255, 255, 0.04);
-  animation: cardIn 0.55s ease-out backwards;
-}
-
-@keyframes cardIn {
-  from {
-    opacity: 0;
-    transform: translateY(20px) scale(0.97);
-  }
-  to {
-    opacity: 1;
-    transform: translateY(0) scale(1);
-  }
-}
-
-.bento-card:hover {
-  background: rgba(255, 255, 255, 0.08);
-}
-
-.bento-card:active {
-  transform: scale(0.99) !important;
-}
-
-/* 右下角装饰 SVG */
-.decor-icon {
-  position: absolute;
-  bottom: -8%;
-  right: -2%;
-  pointer-events: none;
-  z-index: 1;
-  color: white;
-  opacity: 0.04;
-  transition: opacity 0.5s, transform 0.5s;
-  transform: rotate(-8deg);
-}
-
-.decor-lg { width: 120px; height: 120px; }
-.decor-sm { width: 90px; height: 90px; }
-
-@media (min-width: 640px) {
-  .decor-lg { width: 160px; height: 160px; }
-  .decor-sm { width: 110px; height: 110px; }
-}
-
-.decor-icon svg {
-  width: 100%;
-  height: 100%;
-}
-
-.bento-card:hover .decor-icon {
-  opacity: 0.07;
-  transform: rotate(-4deg) scale(1.06);
-}
-
-/* 厨房卡片装饰线条图案 */
-.kitchen-decor-pattern {
-  position: absolute;
-  inset: 0;
-  pointer-events: none;
-  z-index: 1;
-  opacity: 0.025;
-  background-image:
-    radial-gradient(circle at 75% 25%, rgba(245, 158, 11, 0.5) 0%, transparent 50%),
-    repeating-linear-gradient(
-      -45deg,
-      transparent,
-      transparent 20px,
-      rgba(245, 158, 11, 0.15) 20px,
-      rgba(245, 158, 11, 0.15) 21px
-    );
-  transition: opacity 0.5s;
-}
-
-.bento-card:hover .kitchen-decor-pattern {
-  opacity: 0.06;
-}
-
-/* ========== 动态背景光球 ========== */
-.orb {
-  position: absolute;
-  border-radius: 50%;
-  filter: blur(80px);
-  opacity: 0.4;
-  will-change: transform;
-}
-
-.orb-1 {
-  width: 600px;
-  height: 600px;
-  background: linear-gradient(135deg, #a855f7 0%, #7c3aed 50%, #4f46e5 100%);
-  top: -15%;
-  left: -10%;
-  animation: float-1 20s ease-in-out infinite;
-}
-
-.orb-2 {
-  width: 500px;
-  height: 500px;
-  background: linear-gradient(135deg, #06b6d4 0%, #0ea5e9 50%, #3b82f6 100%);
-  bottom: -15%;
-  right: -10%;
-  animation: float-2 25s ease-in-out infinite;
-}
-
-.orb-3 {
-  width: 400px;
-  height: 400px;
-  background: linear-gradient(135deg, #f59e0b 0%, #f97316 50%, #ef4444 100%);
-  top: 50%;
-  left: 50%;
-  transform: translate(-50%, -50%);
-  animation: float-3 18s ease-in-out infinite;
-  opacity: 0.25;
-}
-
-.orb-4 {
-  width: 350px;
-  height: 350px;
-  background: linear-gradient(135deg, #10b981 0%, #14b8a6 50%, #06b6d4 100%);
-  top: 20%;
-  right: 20%;
-  animation: float-4 22s ease-in-out infinite;
-  opacity: 0.3;
-}
-
-@keyframes float-1 {
-  0%, 100% { transform: translate(0, 0) scale(1); }
-  25% { transform: translate(50px, 30px) scale(1.05); }
-  50% { transform: translate(20px, 60px) scale(0.95); }
-  75% { transform: translate(-30px, 20px) scale(1.02); }
-}
-
-@keyframes float-2 {
-  0%, 100% { transform: translate(0, 0) scale(1); }
-  25% { transform: translate(-40px, -30px) scale(1.03); }
-  50% { transform: translate(-70px, 20px) scale(0.97); }
-  75% { transform: translate(20px, -40px) scale(1.05); }
-}
-
-@keyframes float-3 {
-  0%, 100% { transform: translate(-50%, -50%) scale(1) rotate(0deg); }
-  33% { transform: translate(-45%, -55%) scale(1.1) rotate(5deg); }
-  66% { transform: translate(-55%, -45%) scale(0.9) rotate(-5deg); }
-}
-
-@keyframes float-4 {
-  0%, 100% { transform: translate(0, 0) scale(1); }
-  50% { transform: translate(-60px, 40px) scale(1.08); }
-}
-
-/* ========== 小光点粒子 ========== */
-.particle {
-  position: absolute;
-  border-radius: 50%;
-  background: white;
-  opacity: 0.4;
-  will-change: transform, opacity;
-}
-
-.particle-1 { width: 4px; height: 4px; top: 20%; left: 30%; animation: twinkle 3s ease-in-out infinite, drift-1 15s ease-in-out infinite; }
-.particle-2 { width: 3px; height: 3px; top: 60%; left: 15%; animation: twinkle 4s ease-in-out infinite 0.5s, drift-2 18s ease-in-out infinite; }
-.particle-3 { width: 5px; height: 5px; top: 35%; right: 25%; animation: twinkle 3.5s ease-in-out infinite 1s, drift-3 20s ease-in-out infinite; }
-.particle-4 { width: 3px; height: 3px; top: 75%; right: 35%; animation: twinkle 4.5s ease-in-out infinite 1.5s, drift-1 16s ease-in-out infinite reverse; }
-.particle-5 { width: 4px; height: 4px; top: 45%; left: 70%; animation: twinkle 3s ease-in-out infinite 2s, drift-2 22s ease-in-out infinite; }
-.particle-6 { width: 2px; height: 2px; top: 85%; left: 50%; animation: twinkle 5s ease-in-out infinite 0.8s, drift-3 17s ease-in-out infinite; }
-
-@keyframes twinkle {
-  0%, 100% { opacity: 0.2; transform: scale(1); }
-  50% { opacity: 0.8; transform: scale(1.2); }
-}
-
-@keyframes drift-1 {
-  0%, 100% { transform: translate(0, 0); }
-  25% { transform: translate(30px, -20px); }
-  50% { transform: translate(60px, 10px); }
-  75% { transform: translate(20px, 30px); }
-}
-
-@keyframes drift-2 {
-  0%, 100% { transform: translate(0, 0); }
-  33% { transform: translate(-40px, 25px); }
-  66% { transform: translate(20px, -35px); }
-}
-
-@keyframes drift-3 {
-  0%, 100% { transform: translate(0, 0); }
-  50% { transform: translate(-50px, -30px); }
-}
-
-/* ========== 其他样式 ========== */
-.pt-safe {
-  padding-top: max(1rem, env(safe-area-inset-top));
-}
-
-.line-clamp-2 {
-  display: -webkit-box;
-  -webkit-line-clamp: 2;
-  -webkit-box-orient: vertical;
-  overflow: hidden;
-}
-
-@media (prefers-reduced-motion: reduce) {
-  .orb, .particle { animation: none !important; }
-  .bento-card { animation: none !important; }
-  .hero-section { animation: none !important; }
+@media (prefers-reduced-motion:reduce){
+  .word{ animation-duration:.001s; animation-iteration-count:1; opacity:.34;
+         transform:translate3d(var(--x),var(--y),0) }
+  .band,.cloud-back,.hero-sprite,.scroll::after,.caret{ animation:none }
+  .caret{ opacity:1 }
 }
 </style>

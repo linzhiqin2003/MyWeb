@@ -62,3 +62,6 @@ software-tools-summaries-zh/
 
 # Source notebook files (courseware lives in courses/*/courseware/)
 /软件工程.md
+
+# 像素形象设计原型（临时预览资产）
+.sprite-preview/

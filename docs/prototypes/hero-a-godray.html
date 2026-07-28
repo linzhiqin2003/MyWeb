@@ -1,0 +1,680 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>LZQ · 首屏原型</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Geist+Mono:wght@400;500&family=Noto+Sans+SC:wght@200;300;400;500&family=Noto+Serif+SC:wght@400;500&display=swap" rel="stylesheet">
+<style>
+:root{
+  --sky-1:#c8dff6; --sky-2:#e2eefa; --sky-3:#fbfdff;
+  --ink:#1b2836; --ink-soft:#42586e; --muted:#8399ac;
+  --band:#f7fafd;
+  --mono:"Geist Mono",ui-monospace,SFMono-Regular,Menlo,monospace;
+  --sans:"Noto Sans SC","Inter",system-ui,sans-serif;
+  --bar:58px;
+}
+*{box-sizing:border-box;margin:0;padding:0}
+html,body{height:100%}
+body{
+  font-family:var(--sans); color:var(--ink);
+  background:var(--sky-3); overflow-x:hidden;
+}
+
+/* ───────── 舞台 ───────── */
+.stage{
+  position:relative; height:100vh; min-height:600px; overflow:hidden;
+  background:linear-gradient(180deg,var(--sky-1) 0%,var(--sky-2) 46%,var(--sky-3) 100%);
+}
+
+/* 云海背景层：真实体积云。纯 CSS 渐变画不出体积，这是画面质感的来源。
+   底下的线性渐变作为图片加载失败时的兜底，颜色与图片一致。 */
+.cloud-back{
+  position:absolute; inset:-5% -7%;
+  /* 定位在 22% 而非居中：cover 会裁掉上下，必须优先保住上部的天空和地平线，
+     否则云海铺满全屏，画面失去纵深 */
+  background:url("/sprites/cloud-bg.webp") center 22%/cover no-repeat;
+  will-change:transform;
+  animation:sway-back 96s ease-in-out infinite alternate;
+}
+@keyframes sway-back{
+  from{transform:translate3d(-1.4%,0,0) scale(1.03)}
+  to  {transform:translate3d( 1.4%,0,0) scale(1.07)}
+}
+/* 人物：不放在 .center 里随文案走，而是独立定位、由 JS 锚定到背景图中
+   云丘顶面的同一个比例点上 —— 背景走 cover 缩放，只有算出来的位置
+   才能保证任何视口比例下他都踩在同一片云上。 */
+/* hub 同时包住人物与模块，作为 hover 的判定边界。
+   若只在人物上挂 :hover，鼠标一移向模块人物就失焦、模块随即消失，永远点不到。 */
+.hub{
+  position:absolute; z-index:3;
+  width:820px; height:330px; margin-left:-410px;
+  display:flex; align-items:flex-end; justify-content:center;
+}
+/* 展开后把命中区向外扩一圈：鼠标在分身之间游走、或略微越界都不会误判为离开。
+   收起时不启用，否则鼠标只是路过附近就会把分身弹出来。
+   用 ::before 而非 ::after —— 前者绘制在内容之下，不会挡住分身的点击。 */
+.hub::before{
+  content:""; position:absolute; inset:-40px -64px -34px;
+  pointer-events:none;
+}
+.hub-open .hub::before{pointer-events:auto}
+.hero-sprite{
+  /* 高度跟视口走：矮屏上固定 168px 会把人物撑得过大、挤掉文案的位置 */
+  --h:clamp(102px, 18.5vh, 170px); --fw:143; --fh:256; --n:4;
+  position:relative; z-index:2;
+  width:calc(var(--h) * var(--fw) / var(--fh)); height:var(--h);
+  background-image:url("/sprites/walk_back.png"); background-repeat:no-repeat;
+  background-size:calc(var(--h) * var(--fw) * var(--n) / var(--fh)) auto;
+  image-rendering:pixelated;
+  transform-origin:bottom center;
+  /* 定格第 2 帧：双腿并拢，最接近静止站姿 */
+  background-position:calc(-1 * var(--h) * var(--fw) / var(--fh)) 0;
+  /* 逆光描边：光源在右上，高光落在右上侧 */
+  filter:drop-shadow(2px -2px 0 rgba(255,250,235,.9))
+         drop-shadow(-1px 1px 3px rgba(88,118,150,.35));
+  animation:breathe 3.8s ease-in-out infinite;   /* 背影无眼，不做眨眼 */
+  cursor:pointer;
+}
+
+/* ───────── 焦点转移 ─────────
+   模块和词云本来是同一视觉层级，看不出哪个能点。
+   人物被指向时让背景整体退后（降透明 + 轻微失焦），
+   模块自然浮到前景 —— 用景深换层级，比给模块加边框色块干净。 */
+/* 退焦只降透明度，不加 blur：对一个装着 32 个动画元素的容器做模糊，
+   等于每帧把整层重新光栅化一遍，代价远超它带来的效果。 */
+.field, .center{transition:opacity .4s ease}
+.hub-open .field {opacity:.16}
+.hub-open .center{opacity:.34}
+.cloud-back{transition:opacity .5s ease}
+.hub-open .cloud-back{opacity:.9}
+
+/* ───────── 模块入口：他的分身 ─────────
+   四个分身从本体分裂出去，各自做对应模块的事：颠勺、翻页、敲键盘、摊牌。
+   用动作说明模块，比挂四个文字标签直观得多，也用上了整套动作库。 */
+.modules{position:absolute; inset:0; pointer-events:none}
+.mod{
+  position:absolute; left:50%; bottom:14px;
+  display:flex; flex-direction:column; align-items:center; gap:6px;
+  text-decoration:none; white-space:nowrap;
+  /* 收起态：缩成一点藏在本体身上，展开就是「分裂」 */
+  transform:translate(-50%,0) scale(.28);
+  opacity:0; pointer-events:none;
+  transition:transform .52s cubic-bezier(.34,1.32,.5,1),   /* 轻微过冲，像弹出去 */
+             opacity .34s ease;
+}
+.mod-sprite{
+  --h:96px;
+  position:relative;                 /* 给脚下投影做定位上下文 */
+  width:calc(var(--h) * var(--fw) / var(--fh)); height:var(--h);
+  background-repeat:no-repeat; image-rendering:pixelated;
+  background-size:calc(var(--h) * var(--fw) * var(--n) / var(--fh)) auto;
+  transition:transform .22s ease;
+  /* 收起时分身不可见，动画没必要空转 */
+  animation-play-state:paused;
+}
+.hub-open .mod-sprite{animation-play-state:running}
+.mod-label{
+  font-family:var(--mono); font-size:12px; font-weight:500; letter-spacing:.1em;
+  color:var(--ink); opacity:.72;
+  text-shadow:0 0 14px #fff, 0 0 6px #fff;
+  transition:opacity .2s ease;
+}
+/* 分身脚下的小投影，避免看起来浮空 */
+.mod-sprite::after{
+  content:""; position:absolute; left:50%; bottom:0; width:46px; height:7px;
+  transform:translateX(-50%); border-radius:50%;
+  background:radial-gradient(closest-side,rgba(96,130,166,.3),rgba(96,130,166,0));
+}
+.mod:hover .mod-sprite{transform:translateY(-5px)}
+.mod:hover .mod-label{opacity:1}
+
+/* 每个分身的雪碧图参数。前两帧构成循环动作，第三帧是收尾姿势，只播前两帧 */
+.ms-cook {--fw:144; --fh:200; --n:3; background-image:url("/sprites/cook.png");
+          animation:play2-cook .78s steps(2) infinite}
+.ms-read {--fw:140; --fh:200; --n:3; background-image:url("/sprites/read.png");
+          animation:play2-read 1.15s steps(2) infinite}
+.ms-code {--fw:159; --fh:200; --n:3; background-image:url("/sprites/code.png");
+          animation:play2-code .5s steps(2) infinite}
+.ms-tarot{--fw:130; --fh:200; --n:3; background-image:url("/sprites/tarot.png");
+          animation:play3-tarot 2.7s steps(3) infinite}
+@keyframes play2-cook {from{background-position:0 0}
+  to{background-position:calc(-2 * var(--h) * var(--fw) / var(--fh)) 0}}
+@keyframes play2-read {from{background-position:0 0}
+  to{background-position:calc(-2 * var(--h) * var(--fw) / var(--fh)) 0}}
+@keyframes play2-code {from{background-position:0 0}
+  to{background-position:calc(-2 * var(--h) * var(--fw) / var(--fh)) 0}}
+@keyframes play3-tarot{from{background-position:0 0}
+  to{background-position:calc(-3 * var(--h) * var(--fw) / var(--fh)) 0}}
+/* 展开由 class 驱动而非 :hover —— 这样关闭可以留一段缓冲，
+   鼠标在人物与分身之间掠过任何缝隙时都不会闪断。 */
+.hub-open .mod{
+  transform:translate(calc(-50% + var(--dx)), var(--dy)) scale(1);
+  opacity:1; pointer-events:auto;
+}
+/* 依次浮现，比齐刷刷弹出更有生气 */
+.hub-open .mod:nth-child(1){transition-delay:0s,    0s}
+.hub-open .mod:nth-child(2){transition-delay:.055s, .055s}
+.hub-open .mod:nth-child(3){transition-delay:.11s,  .11s}
+.hub-open .mod:nth-child(4){transition-delay:.165s, .165s}
+.mod:hover{color:#0a1219}
+.mod:hover::before{transform:scale(1.6)}
+.ground{
+  position:absolute; left:50%; z-index:2;
+  width:112px; height:12px; margin-left:-56px; border-radius:50%;
+  background:radial-gradient(closest-side,rgba(96,130,166,.24),rgba(96,130,166,0));
+}
+
+/* ───────── 流动云带 ─────────
+   人物脚下那片云不能动（他站着），会动的是空中飘过的云。
+   两条云带按不同高度、不同速度横移，形成风的层次。
+   贴图是镜像拼接的，平移正好一个 background-size 宽即无缝闭环。 */
+/* 用 transform 而不是 background-position 做位移：后者不是合成属性，
+   每帧都要重绘整条云带。元素比容器多出一个贴图宽，平移一个贴图宽即闭环。 */
+.band{
+  position:absolute; left:0; pointer-events:none;
+  background-repeat:repeat-x; background-position-y:center;
+  will-change:transform;
+}
+.band-high{           /* 高空卷云：更慢、更淡、更靠上 */
+  top:6%; height:190px; z-index:1; opacity:.85;
+  width:calc(100% + 1560px);
+  background-image:url("/sprites/band-high.webp");
+  background-size:1560px auto;
+  animation:flow-high 210s linear infinite;
+}
+@keyframes flow-high{
+  from{transform:translate3d(0,0,0)}  to{transform:translate3d(-1560px,0,0)}
+}
+.band-low{            /* 低空积云：稍快、更实，压在地平线附近 */
+  top:34%; height:230px; z-index:2; opacity:.72;
+  width:calc(100% + 1820px);
+  background-image:url("/sprites/band-low.webp");
+  background-size:1820px auto;
+  animation:flow-low 128s linear infinite;
+}
+@keyframes flow-low{
+  from{transform:translate3d(0,0,0)}  to{transform:translate3d(-1820px,0,0)}
+}
+
+/* 高空光晕 */
+.glow{
+  position:absolute;left:50%;top:-14%;width:70vw;height:52vh;transform:translateX(-50%);
+  background:radial-gradient(closest-side,rgba(255,255,255,.9),rgba(255,255,255,0));
+  pointer-events:none;
+}
+/* 极淡暗角，做电影味，不要拉太重 */
+.vignette{
+  position:absolute;inset:0;pointer-events:none;
+  background:radial-gradient(120% 90% at 50% 45%,rgba(255,255,255,0) 55%,rgba(120,150,180,.14) 100%);
+}
+
+
+/* ───────── A 版专属：方向光 ─────────
+   白光柱叠在白云上本来看不见，必须先造暗部。压暗左下，光才有地方亮出来。 */
+.shade{
+  position:absolute; inset:0; z-index:2; pointer-events:none;
+  background:
+    linear-gradient(to top right, rgba(84,116,156,.40) 0%, rgba(84,116,156,.13) 40%,
+                    rgba(84,116,156,0) 64%),
+    radial-gradient(90% 70% at 88% 6%, rgba(255,252,240,.55), rgba(255,252,240,0) 60%);
+}
+.sun{
+  position:absolute; right:-6%; top:-16%; width:48vw; height:48vw;
+  background:radial-gradient(closest-side,rgba(255,252,242,.95),rgba(255,252,242,0) 70%);
+  z-index:2; pointer-events:none;
+  animation:sun-breathe 17s ease-in-out infinite alternate;
+}
+@keyframes sun-breathe{from{opacity:.75}to{opacity:1}}
+.rays{
+  position:absolute; inset:-8% -10% -20% -6%;
+  background:url("/sprites/rays.webp") right top/cover no-repeat;
+  z-index:4; pointer-events:none; will-change:opacity,transform;
+  animation:rays-breathe 17s ease-in-out infinite alternate;
+}
+@keyframes rays-breathe{
+  from{opacity:.78; transform:translate3d(0,0,0)}
+  to  {opacity:1;   transform:translate3d(-1.6%,.8%,0)}
+}
+
+/* ───────── 词云：3D 汇聚 ───────── */
+.field{
+  position:absolute;inset:0;
+  /* perspective 越小透视越强。配合更大的 z 行程，词从 2.1 倍缩到 0.35 倍，
+     整整六倍的尺寸变化，「由远及近」才真的读得出来。 */
+  perspective:800px; perspective-origin:50% 46%;
+  pointer-events:none;
+}
+.word{
+  position:absolute; left:50%; top:46%;
+  font-family:var(--mono); font-weight:400; white-space:nowrap;
+  color:var(--ink-soft); opacity:0;
+  /* 云海是高频背景，纯文字会被吃掉；一圈白光晕把字从云里托出来 */
+  text-shadow:0 0 14px rgba(255,255,255,.7), 0 0 4px rgba(255,255,255,.5);
+  --peak:.5; --b0:0px; --rot:0deg;
+  will-change:transform,opacity;
+  animation-name:converge; animation-timing-function:linear;
+  animation-iteration-count:infinite;
+}
+/* 三类词各有自己的字体语言。视觉差异直接承载语义 ——
+   扫一眼就知道两个世界的东西都留在他身上，不用写一个字解释。 */
+.g-fin {                       /* 旧世界：衬线，冷灰，端正 */
+  font-family:"Noto Serif SC",Georgia,serif; font-weight:400;
+  color:#5b6d80; letter-spacing:.02em;
+}
+.g-tech{                       /* 新世界：等宽，偏蓝，疏朗 */
+  font-family:"Geist Mono",ui-monospace,"Noto Sans SC",monospace; font-weight:400;
+  color:#3f5f7e; letter-spacing:.09em;
+}
+.g-life{                       /* 生活：细体无衬线，最轻 */
+  font-family:var(--sans); font-weight:200;
+  color:#74838f; letter-spacing:.06em;
+}
+/* 只有背景层的大词才建立滤镜层。写成静态而非 @keyframes 里的变量：
+   模糊值一旦逐帧变化就要逐帧重算高斯模糊，是整页最贵的开销。
+   而 blur(0) 同样会创建滤镜层，所以小词干脆不带 filter 这条声明。 */
+.word.soft{filter:blur(var(--b0))}
+/* 被吸向中心深处，逐渐变小后消失。
+   终点保留 58% 的横向偏移：词只是「靠拢」而不真的压到中心文案上。
+   整条轨道只动 transform 与 opacity，全程留在合成层。 */
+@keyframes converge{
+  0%   {transform:translate3d(var(--x),var(--y),420px) rotate(var(--rot));
+        opacity:0}
+  10%  {opacity:var(--peak)}
+  /* 中间这一帧是关键：前 45% 的时间只走完四分之一的深度，
+     词在「大」的状态停留得够久，由大变小才看得出来；
+     剩下 55% 的时间冲完剩下的距离，收尾干脆。 */
+  45%  {transform:translate3d(calc(var(--x)*.84),calc(var(--y)*.84),40px)
+                  rotate(calc(var(--rot) * .45));
+        opacity:calc(var(--peak) * .8)}
+  80%  {opacity:.09}
+  100% {transform:translate3d(calc(var(--x)*.5),calc(var(--y)*.5),-1500px)
+                 rotate(calc(var(--rot) * -.5));
+        opacity:0}
+}
+
+/* ───────── 中心内容 ───────── */
+/* top 由 JS 依据人物位置计算，这里只给个首屏兜底值，避免脚本执行前跳一下 */
+.center{
+  position:absolute; left:50%; top:26%; transform:translateX(-50%);
+  width:min(94vw,1040px); text-align:center; z-index:3;
+  /* 纯展示，必须让出鼠标：它有 1040px 宽、在 DOM 里排在 hub 之后，
+     否则会盖住分身的上半部分，鼠标看着在分身上、实际命中的是这层。 */
+  pointer-events:none;
+}
+/* 词云会从文案上方穿过，垫一层柔光保证可读性——是光不是色块 */
+.center::before{
+  content:""; position:absolute; left:50%; top:36%;
+  width:112%; height:150%; transform:translate(-50%,-50%);
+  background:radial-gradient(closest-side,rgba(255,255,255,.52),rgba(255,255,255,0) 72%);
+  pointer-events:none; z-index:-1;
+}
+.line{
+  font-family:var(--mono); font-size:clamp(24px,4.4vw,64px); font-weight:500;
+  letter-spacing:.01em; min-height:1.4em; color:var(--ink);
+}
+.caret{
+  display:inline-block; width:.56em; height:1.02em; margin-left:.06em;
+  background:var(--ink); vertical-align:-.16em;
+  animation:caret 1.05s steps(1) infinite;
+}
+@keyframes caret{0%,50%{opacity:1}51%,100%{opacity:0}}
+.sub{
+  margin-top:16px; font-family:var(--mono); font-size:clamp(11px,1.05vw,15px);
+  letter-spacing:.24em; color:var(--muted); text-transform:uppercase;
+  min-height:1.4em;
+}
+
+/* 眨眼只切 background-position，呼吸只改 transform，两条轨道互不干扰 */
+@keyframes blink{
+  0%,93%    {background-position:0 0}
+  94%,96.4% {background-position:calc(-1 * var(--h) * var(--fw) / var(--fh)) 0}
+  97%,100%  {background-position:0 0}
+}
+@keyframes breathe{
+  0%,100%{transform:scaleY(1)}
+  50%    {transform:scaleY(.988)}
+}
+/* 悬停时本体往前走 —— 背影加走路，正好是「一直在路上」 */
+.hero-sprite:hover{
+  animation:walkaway .72s steps(var(--n)) infinite,
+            breathe 3.8s ease-in-out infinite;
+}
+@keyframes walkaway{
+  from{background-position:0 0}
+  to  {background-position:calc(-1 * var(--h) * var(--fw) * var(--n) / var(--fh)) 0}
+}
+
+/* ───────── 电影 chrome ───────── */
+.bar{
+  position:absolute; left:0; right:0; height:var(--bar); z-index:5;
+  display:flex; align-items:center; justify-content:space-between;
+  padding:0 26px; background:var(--band);
+  font-family:var(--mono); font-size:11px; letter-spacing:.16em;
+  color:var(--muted); text-transform:uppercase;
+}
+.bar.top{top:0; border-bottom:1px solid rgba(120,150,180,.14)}
+.bar.bottom{bottom:0; border-top:1px solid rgba(120,150,180,.14)}
+.bar nav{display:flex;gap:26px}
+.bar a{color:var(--muted);text-decoration:none;transition:color .18s}
+.bar a:hover{color:var(--ink)}
+.slate{display:flex;gap:22px}
+.slate b{font-weight:400;color:var(--ink-soft)}
+
+/* 滚动提示：一条细线里有个缓慢下滑的点，不用脉冲呼吸灯 */
+.scroll{
+  position:absolute; left:50%; bottom:calc(var(--bar) + 26px); transform:translateX(-50%);
+  width:1px; height:46px; background:rgba(120,150,180,.28); z-index:4;
+}
+.scroll::after{
+  content:""; position:absolute; left:-2px; top:0; width:5px; height:5px;
+  border-radius:50%; background:var(--ink-soft);
+  animation:fall 2.6s cubic-bezier(.4,0,.5,1) infinite;
+}
+@keyframes fall{
+  0%{transform:translateY(0);opacity:0}
+  22%{opacity:.85}
+  75%{opacity:.85}
+  100%{transform:translateY(41px);opacity:0}
+}
+
+@media (max-width:640px){
+  :root{--bar:38px}
+  .hero-sprite{--h:96px}
+  .slate{gap:12px}
+  .slate .hide-sm{display:none}
+}
+@media (prefers-reduced-motion:reduce){
+  .word{animation-duration:.001s;animation-iteration-count:1;opacity:.34;
+        transform:translate3d(var(--x),var(--y),0);filter:none}
+  .band,.cloud-back,.hero-sprite,.scroll::after,.caret{animation:none}
+  .caret{opacity:1}
+}
+</style>
+</head>
+<body>
+<div class="stage">
+  <div class="cloud-back"></div>
+  <div class="band band-high"></div>
+  <div class="band band-low"></div>
+  <div class="shade"></div>
+  <div class="sun"></div>
+  <div class="field" id="field"></div>
+  <div class="vignette"></div>
+  <div class="rays"></div>
+  <div class="ground"></div>
+  <div class="hub">
+    <div class="hero-sprite"></div>
+    <div class="modules">
+      <a class="mod" href="#" style="--dx:-232px; --dy:-104px">
+        <span class="mod-sprite ms-cook"></span><span class="mod-label">私人厨房</span></a>
+      <a class="mod" href="#" style="--dx: 232px; --dy:-104px">
+        <span class="mod-sprite ms-read"></span><span class="mod-label">技术博客</span></a>
+      <a class="mod" href="#" style="--dx:-268px; --dy:  16px">
+        <span class="mod-sprite ms-code"></span><span class="mod-label">智能题库</span></a>
+      <a class="mod" href="#" style="--dx: 268px; --dy:  16px">
+        <span class="mod-sprite ms-tarot"></span><span class="mod-label">塔罗秘仪</span></a>
+    </div>
+  </div>
+
+  <div class="bar top">
+    <span>lzqqq.org</span>
+    <nav>
+      <a href="#">厨房</a><a href="#">博客</a><a href="#">出题</a><a href="#">塔罗</a>
+    </nav>
+  </div>
+
+  <div class="center">
+    <div class="line"><span id="type"></span><span class="caret"></span></div>
+    <div class="sub" id="sub"></div>
+  </div>
+
+  <div class="scroll"></div>
+
+  <div class="bar bottom">
+    <div class="slate">
+      <span>LOCATION: <b>在路上</b></span>
+      <span class="hide-sm">TIME: <b id="clock">--:--</b></span>
+    </div>
+    <div class="slate">
+      <span class="hide-sm">FRAMES: <b>&infin;</b></span>
+      <span>MEMORY: <b>IN PROGRESS</b></span>
+    </div>
+  </div>
+</div>
+
+<script>
+/* ══ 可配置区：词表与文案都在这里，改这一段即可 ══════════════════ */
+// g 决定字体语言：fin=衬线（旧世界） tech=等宽（新世界） life=细体（生活）
+// 两个世界的词混在同一片天上，视觉差异本身就把故事讲完了，不用写一句解释。
+const WORDS = [
+  {t:"复利", g:"fin"},      {t:"风险", g:"fin"},      {t:"套利", g:"fin"},
+  {t:"市场", g:"fin"},      {t:"回测", g:"fin"},      {t:"波动率", g:"fin"},
+  {t:"Alpha", g:"fin"},     {t:"Signal", g:"fin"},
+
+  {t:"Agent", g:"tech"},    {t:"上下文", g:"tech"},   {t:"推理", g:"tech"},
+  {t:"并发", g:"tech"},     {t:"收敛", g:"tech"},     {t:"泛化", g:"tech"},
+  {t:"Context", g:"tech"},  {t:"Latency", g:"tech"},  {t:"Prompt", g:"tech"},
+  {t:"Vector", g:"tech"},
+
+  {t:"厨房", g:"life"},     {t:"塔罗", g:"life"},     {t:"写作", g:"life"},
+  {t:"好奇", g:"life"},     {t:"直觉", g:"life"},     {t:"咖啡", g:"life"},
+  {t:"Kitchen", g:"life"},  {t:"Tarot", g:"life"},    {t:"Blog", g:"life"},
+  {t:"Questions", g:"life"},{t:"Curiosity", g:"life"},{t:"在路上", g:"life"},
+  {t:"深夜", g:"life"},     {t:"Sketch", g:"life"},
+];
+
+const LINES = [
+  "你好，我是 LZQ.",
+  "技术理想，一直在路上。",
+];
+const SUBS = [
+  "personal site · still walking",
+  "building small worlds",
+];
+/* ════════════════════════════════════════════════════════════ */
+
+/* ── 词云 ──────────────────────────────────────────────────────
+   分两个景深层，这是让画面有纵深的关键：
+     背景层  字号极大、几乎透明、重模糊 —— 提供压迫感和体量
+     前景层  字号小、较实、不模糊       —— 提供可读的细节
+   半径与字号都按视口换算，否则大屏上全挤在中间一小团。          */
+(function buildField(){
+  const field = document.getElementById("field");
+  const frag  = document.createDocumentFragment();
+  const n = WORDS.length;
+  const items = [];
+
+  // 每个词的随机特征只掷一次并存下来。位置依赖视口，必须能重算；
+  // 若重算时连随机数一起重掷，改变窗口大小整片词云会突然换一副样子。
+  WORDS.forEach((w, i) => {
+    const el = document.createElement("span");
+    el.className = "word g-" + (w.g || "life");
+    el.textContent = w.t;
+    // 每个词带一点自转，运动就不像直线滑轨那么机械
+    el.style.setProperty("--rot", ((Math.random() - .5) * 11).toFixed(1) + "deg");
+
+    const big = i % 3 === 0;                 // 三分之一进背景层
+    // 大词压在画面下半的两角当前景（对应效果图里左下右下那两团巨字），
+    // 小词绕全圈分布。大词若飘到天上，天空会被糊住、纵深就没了。
+    const ang = big
+      ? Math.PI * (0.10 + Math.random() * 0.80)          // 下半圆
+      : (i / n) * Math.PI * 2 + (Math.random() - .5) * .6;
+
+    const seed = { el, big, ca: Math.cos(ang), sa: Math.sin(ang),
+                   f0: (big ? .62 : .42) + Math.random() * .46,
+                   sz: Math.random() };
+
+    el.style.setProperty("--peak",
+      big ? (.20 + Math.random() * .12).toFixed(2)
+          : (.44 + Math.random() * .2).toFixed(2));
+    if (big){                       // 只有大词建滤镜层，小词完全不带 filter
+      el.classList.add("soft");
+      el.style.setProperty("--b0", (4 + Math.random() * 3).toFixed(0) + "px");
+    }
+
+    const dur = 11 + Math.random() * 8;
+    el.style.animationDuration = dur.toFixed(2) + "s";
+    // 负延迟：页面一打开词云就已在运行中，没有空场的头几秒
+    el.style.animationDelay = (-Math.random() * dur).toFixed(2) + "s";
+
+    items.push(seed);
+    frag.appendChild(el);
+  });
+  field.appendChild(frag);
+
+  function layout(){
+    // 用 clientWidth 兜底：容器以 0 尺寸完成首次渲染时 innerWidth 可能为 0，
+    // 那样 Rx/Ry 全塌成 0，整片词云会堆死在原点。
+    const vw = field.clientWidth  || innerWidth  || 1280;
+    const vh = field.clientHeight || innerHeight || 720;
+    if (!vw || !vh) return;
+
+    // 半径与字号都要把透视放大折算进去：起始 z=420、perspective=800，
+    // 屏幕上被放大 800/(800-420)≈2.1 倍。照半屏宽直接布点，词会整片飞出视野。
+    const PERSP = 800 / (800 - 420);
+    const Rx = vw * .52 / PERSP, Ry = vh * .50 / PERSP;
+    // 禁区按「标题实际占的宽度」算，不是容器宽度 —— 容器有 1040px，
+    // 而标题只有五百来像素，照容器算会把禁区撑到屏幕的三分之二。
+    const keepW = Math.min(vw * .30, 430), keepH = 200;
+
+    for (const s of items){
+      let f = s.f0, px = s.ca * Rx * f, py = s.sa * Ry * f;
+      // 禁区比的是屏幕上的实际位置，所以要乘回透视放大倍数
+      while (Math.abs(px * PERSP) < keepW && Math.abs(py * PERSP) < keepH && f < 1.35){
+        f += .08; px = s.ca * Rx * f; py = s.sa * Ry * f;
+      }
+      s.el.style.setProperty("--x", px.toFixed(0) + "px");
+      s.el.style.setProperty("--y", py.toFixed(0) + "px");
+      // 字号同样是折算前的基准值，入场瞬间会被放大到约 2.1 倍
+      s.el.style.fontSize = (s.big ? Math.max(34, vw * .027) + s.sz * 34
+                                   : 12 + s.sz * 14).toFixed(0) + "px";
+    }
+  }
+
+  layout();
+  addEventListener("resize", layout);
+  // 容器尺寸未必随窗口变化（预览面板、分栏布局），直接盯容器本身
+  if (window.ResizeObserver) new ResizeObserver(layout).observe(field);
+
+  // 鼠标视差：整片词云随指针轻微反向偏移，天空就有了体积。
+  // 只动 field 一层的 transform，不碰 32 个子元素。
+  if (!matchMedia("(prefers-reduced-motion: reduce)").matches){
+    field.style.transition = "transform .5s cubic-bezier(.22,1,.36,1)";
+    addEventListener("mousemove", e => {
+      const dx = e.clientX / innerWidth  - .5;
+      const dy = e.clientY / innerHeight - .5;
+      field.style.transform = `translate3d(${(-dx * 26).toFixed(1)}px, ${(-dy * 18).toFixed(1)}px, 0)`;
+    }, {passive:true});
+  }
+})();
+
+/* ── 打字机：主句逐字，副句跟随切换 ── */
+(function typewriter(){
+  const out = document.getElementById("type");
+  const sub = document.getElementById("sub");
+  const reduce = matchMedia("(prefers-reduced-motion: reduce)").matches;
+
+  if (reduce) { out.textContent = LINES[0]; sub.textContent = SUBS[0]; return; }
+
+  let li = 0;
+  const TYPE = 68, ERASE = 30, HOLD = 2100;
+
+  function type(i = 0){
+    if (i === 0) sub.textContent = SUBS[li % SUBS.length];
+    if (i <= LINES[li].length){
+      out.textContent = LINES[li].slice(0, i);
+      setTimeout(() => type(i + 1), TYPE);
+    } else {
+      setTimeout(() => erase(LINES[li].length), HOLD);
+    }
+  }
+  function erase(i){
+    if (i >= 0){
+      out.textContent = LINES[li].slice(0, i);
+      setTimeout(() => erase(i - 1), ERASE);
+    } else {
+      li = (li + 1) % LINES.length;
+      setTimeout(() => type(0), 360);
+    }
+  }
+  type();
+})();
+
+/* ── 把人物锚定到背景图里云丘顶面的同一个点 ──────────────────────
+   背景用 cover，缩放和裁切量随视口比例变化；若人物只用百分比定位，
+   两者必然错位。这里复算一遍 cover 的几何，让脚底始终落在同一片云上。 */
+(function anchorSprite(){
+  const IMG_W = 1536, IMG_H = 1024;   // 背景图原始尺寸
+  const RIDGE_X = .505, RIDGE_Y = .60; // 云丘顶面在图中的相对位置
+  const POS_Y = .22;                   // 必须与 .cloud-back 的 background-position 一致
+  const INSET_X = .07, INSET_Y = .05;  // 与 .cloud-back 的 inset 一致
+
+  const hub    = document.querySelector(".hub");
+  const sprite = document.querySelector(".hero-sprite");
+  const ground = document.querySelector(".ground");
+  const center = document.querySelector(".center");
+  const stage  = document.querySelector(".stage");
+
+  function place(){
+    const vw = stage.clientWidth, vh = stage.clientHeight;
+    const cw = vw * (1 + INSET_X * 2), ch = vh * (1 + INSET_Y * 2);
+    const ox = -vw * INSET_X,          oy = -vh * INSET_Y;
+
+    const scale = Math.max(cw / IMG_W, ch / IMG_H);   // cover
+    const dw = IMG_W * scale, dh = IMG_H * scale;
+
+    const x = ox + (cw - dw) * .5    + dw * RIDGE_X;
+    const y = oy + (ch - dh) * POS_Y + dh * RIDGE_Y;
+
+    const feetY   = y;                                  // 云顶 = 脚底
+    const headY   = feetY - sprite.offsetHeight;
+
+    // hub 的底边对齐脚底：人物在 hub 内靠底排布，模块相对它散开
+    hub.style.left = x + "px";
+    hub.style.top  = (feetY - hub.offsetHeight) + "px";
+    ground.style.left = x + "px";
+    ground.style.top  = (feetY - 7) + "px";
+
+    // 文案排在人物头顶之上。两者若各写各的百分比，矮视口下必然相撞，
+    // 所以位置关系必须由内容决定：底部对齐到人物头顶再留一段呼吸。
+    const bar = parseFloat(getComputedStyle(document.documentElement)
+                  .getPropertyValue("--bar")) || 58;
+    const top = Math.max(bar + 22, headY - 30 - center.offsetHeight);
+    center.style.top = top + "px";
+  }
+
+  place();
+  addEventListener("resize", place);
+  // 字体/图片就位后尺寸可能变，再校一次
+  addEventListener("load", place);
+
+  // 展开/收起统一由这个标记驱动：CSS 只认 .hub-open，不认 :hover。
+  // 关闭留 160ms 缓冲，鼠标在人物与分身之间移动时不会闪断；
+  // 期间重新进入则取消关闭。
+  let closeTimer = null;
+  const open  = () => { clearTimeout(closeTimer); stage.classList.add("hub-open"); };
+  const close = () => { closeTimer = setTimeout(
+                          () => stage.classList.remove("hub-open"), 260); };
+  hub.addEventListener("mouseenter", open);
+  hub.addEventListener("mouseleave", close);
+  // 键盘可达：Tab 到任一分身也应展开
+  hub.addEventListener("focusin",  open);
+  hub.addEventListener("focusout", close);
+})();
+
+/* ── 场记板上的时间：假装是元数据，其实是真的 ── */
+(function clock(){
+  const el = document.getElementById("clock");
+  const tick = () => {
+    const d = new Date();
+    el.textContent = String(d.getHours()).padStart(2,"0") + ":" +
+                     String(d.getMinutes()).padStart(2,"0");
+  };
+  tick(); setInterval(tick, 20000);
+})();
+</script>
+</body>
+</html>

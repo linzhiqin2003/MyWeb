@@ -1,0 +1,103 @@
+{
+  "core": {
+    "frames": 3,
+    "fw": 137,
+    "fh": 256,
+    "labels": [
+      "idle",
+      "blink",
+      "wave"
+    ],
+    "duration": 4.6
+  },
+  "walk": {
+    "frames": 4,
+    "fw": 147,
+    "fh": 256,
+    "labels": [
+      "contact",
+      "pass",
+      "contact2",
+      "pass2"
+    ],
+    "duration": 0.72
+  },
+  "walk_back": {
+    "frames": 4,
+    "fw": 143,
+    "fh": 256,
+    "labels": [
+      "contact",
+      "pass",
+      "contact2",
+      "pass2"
+    ],
+    "duration": 0.72
+  },
+  "rest": {
+    "frames": 3,
+    "fw": 142,
+    "fh": 256,
+    "labels": [
+      "look_up",
+      "sit",
+      "sleep"
+    ],
+    "duration": 3.0
+  },
+  "emote": {
+    "frames": 3,
+    "fw": 174,
+    "fh": 256,
+    "labels": [
+      "thinking",
+      "surprised",
+      "celebrate"
+    ],
+    "duration": 3.0
+  },
+  "cook": {
+    "frames": 3,
+    "fw": 144,
+    "fh": 200,
+    "labels": [
+      "pan_a",
+      "pan_b",
+      "taste"
+    ],
+    "duration": 0.8
+  },
+  "read": {
+    "frames": 3,
+    "fw": 140,
+    "fh": 200,
+    "labels": [
+      "read_a",
+      "read_b",
+      "ponder"
+    ],
+    "duration": 1.2
+  },
+  "code": {
+    "frames": 3,
+    "fw": 159,
+    "fh": 200,
+    "labels": [
+      "typing_a",
+      "typing_b",
+      "stretch"
+    ],
+    "duration": 0.8
+  },
+  "tarot": {
+    "frames": 3,
+    "fw": 130,
+    "fh": 200,
+    "labels": [
+      "draw",
+      "spread",
+      "divine"
+    ],
+    "duration": 3.0
+  }
+}
