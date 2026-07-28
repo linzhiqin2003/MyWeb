@@ -301,7 +301,7 @@ onUnmounted(() => {
    定位 22% 而非居中 —— cover 会裁掉上下，必须优先保住上部的天空和地平线。 */
 .cloud-back{
   position:absolute; inset:-5% -7%;
-  background:url("/sprites/cloud-bg.webp") center 22%/cover no-repeat;
+  background:url("../assets/sprites/cloud-bg.webp") center 22%/cover no-repeat;
   will-change:transform;
   animation:sway-back 96s ease-in-out infinite alternate;
 }
@@ -321,7 +321,7 @@ onUnmounted(() => {
 .band-high{
   top:6%; height:190px; z-index:1; opacity:.85;
   width:calc(100% + 1560px);
-  background-image:url("/sprites/band-high.webp"); background-size:1560px auto;
+  background-image:url("../assets/sprites/band-high.webp"); background-size:1560px auto;
   animation:flow-high 210s linear infinite;
 }
 @keyframes flow-high{
@@ -330,7 +330,7 @@ onUnmounted(() => {
 .band-low{
   top:34%; height:230px; z-index:2; opacity:.72;
   width:calc(100% + 1820px);
-  background-image:url("/sprites/band-low.webp"); background-size:1820px auto;
+  background-image:url("../assets/sprites/band-low.webp"); background-size:1820px auto;
   animation:flow-low 128s linear infinite;
 }
 @keyframes flow-low{
@@ -438,7 +438,7 @@ onUnmounted(() => {
   --h:clamp(104px, 19vh, 176px); --fw:137; --fh:256; --n:3;
   position:relative; z-index:2;
   width:calc(var(--h) * var(--fw) / var(--fh)); height:var(--h);
-  background-image:url("/sprites/core.png"); background-repeat:no-repeat;
+  background-image:url("../assets/sprites/core.png"); background-repeat:no-repeat;
   background-size:calc(var(--h) * var(--fw) * var(--n) / var(--fh)) auto;
   image-rendering:pixelated; transform-origin:bottom center; cursor:pointer;
   animation:blink 5.4s steps(1) infinite, breathe 3.8s ease-in-out infinite;
@@ -517,13 +517,13 @@ onUnmounted(() => {
 .mod:hover .mod-label{ opacity:1 }
 
 /* 每个分身的雪碧图参数。前两帧构成循环动作，第三帧是收尾姿势，只播前两帧 */
-.ms-cook { --fw:144; --fh:200; --n:3; background-image:url("/sprites/cook.png");
+.ms-cook { --fw:144; --fh:200; --n:3; background-image:url("../assets/sprites/cook.png");
            animation:play2-cook .78s steps(2) infinite }
-.ms-read { --fw:140; --fh:200; --n:3; background-image:url("/sprites/read.png");
+.ms-read { --fw:140; --fh:200; --n:3; background-image:url("../assets/sprites/read.png");
            animation:play2-read 1.15s steps(2) infinite }
-.ms-code { --fw:159; --fh:200; --n:3; background-image:url("/sprites/code.png");
+.ms-code { --fw:159; --fh:200; --n:3; background-image:url("../assets/sprites/code.png");
            animation:play2-code .5s steps(2) infinite }
-.ms-tarot{ --fw:130; --fh:200; --n:3; background-image:url("/sprites/tarot.png");
+.ms-tarot{ --fw:130; --fh:200; --n:3; background-image:url("../assets/sprites/tarot.png");
            animation:play3-tarot 2.7s steps(3) infinite }
 @keyframes play2-cook { from{background-position:0 0}
   to{background-position:calc(-2 * var(--h) * var(--fw) / var(--fh)) 0} }
