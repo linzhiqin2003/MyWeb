@@ -13,9 +13,9 @@
     </ol>
 
     <div class="dialogue" :class="{ 'no-sprite': hideSprite }">
-      <OracleSprite v-if="!hideSprite" :pose="pose" :size="size" :sparkle="sparkle" />
+      <OracleSprite v-if="!hideSprite" :pose="pose" :size="size" :sparkle="sparkle" interactive />
       <div class="box">
-        <div class="nameplate">占卜师</div>
+        <div class="nameplate">LZQ</div>
         <p class="line font-chinese-body">{{ shown }}<span v-if="typing" class="caret">▌</span></p>
         <span v-if="!typing" class="next-tri">▼</span>
       </div>

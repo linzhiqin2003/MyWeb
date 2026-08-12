@@ -1,14 +1,21 @@
 <template>
   <TarotShell :show-moon="true" :show-sigil="true" back-to="/" back-label="返回家园">
-    <div class="flex flex-col items-center px-4 pb-10 pt-2 text-center min-h-[78vh]">
-      <p class="text-[10px] tracking-[0.45em] uppercase text-mystic-purple mb-2">NPC · Oracle</p>
-      <h1 class="text-3xl sm:text-5xl tracking-[0.22em] uppercase glow-text mb-1">Tarot Sanctum</h1>
-      <p class="font-chinese-title text-lg sm:text-xl text-mystic-gold/80 mb-4">塔罗圣所</p>
+    <div class="stage">
+      <p class="kicker">lzqqq.org · tarot</p>
+      <h1 class="title glow-text">Tarot Sanctum</h1>
+      <p class="subtitle font-chinese-title">塔罗圣所</p>
 
-      <OracleSprite pose="greet" size="hero" :sparkle="true" class="mb-2" />
+      <div class="hero" :class="{ entering }">
+        <OracleSprite
+          :pose="heroPose"
+          size="hero"
+          :sparkle="!entering"
+          interactive
+        />
+      </div>
 
       <div class="w-full max-w-xl mb-8">
-        <OracleHud pose="greet" :line="greeting" hide-sprite />
+        <OracleHud :pose="heroPose" :line="line" hide-sprite />
       </div>
 
       <div class="w-full max-w-xl text-left space-y-2">
@@ -21,7 +28,7 @@
         >
           <span class="cursor">▶</span>
           <span class="idx">{{ index + 1 }}</span>
-          <span class="title font-chinese-title">{{ portal.title }}</span>
+          <span class="title-row font-chinese-title">{{ portal.title }}</span>
           <span class="desc font-chinese-body">{{ portal.desc }}</span>
         </router-link>
       </div>
@@ -30,11 +37,25 @@
 </template>
 
 <script setup>
+import { computed, onMounted, onUnmounted, ref } from 'vue';
 import TarotShell from '../../components/tarot/TarotShell.vue';
 import OracleSprite from '../../components/tarot/OracleSprite.vue';
 import OracleHud from '../../components/tarot/OracleHud.vue';
 
-const greeting = '你来了。今晚想问哪一层？选一条路，我把牌摊开。';
+const entering = ref(true);
+let timer = null;
+
+onMounted(() => {
+  timer = setTimeout(() => { entering.value = false; }, 1400);
+});
+onUnmounted(() => { if (timer) clearTimeout(timer); });
+
+const heroPose = computed(() => (entering.value ? 'walk' : 'greet'));
+const line = computed(() => (
+  entering.value
+    ? '……我到了。'
+    : '你来了。今晚想问哪一层？选一条路，我把牌摊开。'
+));
 
 const portals = [
   { to: '/tarot/ritual', title: '占卜仪式', desc: '选阵、洗牌、亲手抽' },
@@ -46,8 +67,44 @@ const portals = [
 </script>
 
 <style scoped>
+.stage {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  text-align: center;
+  min-height: 78vh;
+  padding: 8px 16px 40px;
+}
+.kicker {
+  font-family: 'Press Start 2P', monospace;
+  font-size: 9px;
+  letter-spacing: 0.18em;
+  color: #a855f7;
+  margin-bottom: 10px;
+}
+.title {
+  font-size: clamp(1.8rem, 5vw, 3.2rem);
+  letter-spacing: 0.22em;
+  text-transform: uppercase;
+  margin-bottom: 4px;
+}
+.subtitle {
+  font-size: 1.15rem;
+  color: rgba(255, 215, 0, 0.8);
+  margin-bottom: 8px;
+}
 .glow-text {
   text-shadow: 0 0 10px rgba(255, 215, 0, 0.5), 0 0 24px rgba(168, 85, 247, 0.25);
+}
+.hero {
+  margin: 8px 0 18px;
+}
+.hero.entering {
+  animation: walkIn 1.4s ease-out both;
+}
+@keyframes walkIn {
+  from { transform: translateX(-42vw); }
+  to { transform: translateX(0); }
 }
 .font-pixel {
   font-family: 'Press Start 2P', monospace;
@@ -70,10 +127,7 @@ const portals = [
   background: rgba(255, 215, 0, 0.08);
   transform: translateX(6px);
 }
-.cursor {
-  color: transparent;
-  font-size: 12px;
-}
+.cursor { color: transparent; font-size: 12px; }
 .menu-row:hover .cursor,
 .menu-row:focus-visible .cursor {
   color: #ffd700;
@@ -84,7 +138,7 @@ const portals = [
   font-size: 10px;
   color: #a855f7;
 }
-.title { color: #ffd700; font-size: 1.15rem; }
+.title-row { color: #ffd700; font-size: 1.15rem; }
 .desc { color: #9ca3af; font-size: 0.85rem; }
 @keyframes nudge {
   0%, 100% { transform: translateX(0); }
