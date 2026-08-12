@@ -1,5 +1,9 @@
 <template>
-  <TarotShell>
+  <TarotShell
+    :show-hud="true"
+    oracle-pose="think"
+    oracle-line="你问过的话还在这台设备上。要不要再读一遍？"
+  >
     <div class="max-w-3xl mx-auto px-4 pb-16">
       <div class="text-center mb-8">
         <p class="text-[10px] tracking-[0.45em] uppercase text-mystic-purple mb-2">Journal</p>

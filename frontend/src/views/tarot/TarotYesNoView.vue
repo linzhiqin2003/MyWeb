@@ -1,5 +1,14 @@
 <template>
-  <TarotShell :show-candle="true" :show-sigil="true">
+  <TarotShell
+    :show-candle="true"
+    :show-sigil="true"
+    :show-hud="true"
+    :oracle-pose="oraclePose"
+    :oracle-line="oracleLine"
+    :oracle-sparkle="step === 'shuffle' || loading"
+    :quest="['提问', '抽牌', '神谕']"
+    :quest-index="questIndex"
+  >
     <div class="max-w-3xl mx-auto px-4 pb-16 flex flex-col items-center text-center">
       <p class="text-[10px] tracking-[0.45em] uppercase text-mystic-purple mb-2">Yes / No</p>
       <h2 class="text-3xl sm:text-4xl tracking-widest uppercase glow-text mb-2">是非一问</h2>
@@ -23,8 +32,9 @@
         </button>
       </div>
 
-      <div v-else-if="step === 'shuffle'" class="h-72 flex items-center justify-center">
-        <div class="w-40 h-60 rounded-xl overflow-hidden border border-mystic-gold shuffle-pulse">
+      <div v-else-if="step === 'shuffle'" class="h-72 flex flex-col items-center justify-center gap-3">
+        <OracleSprite pose="shuffle" size="lg" :sparkle="true" />
+        <div class="w-28 h-40 rounded-xl overflow-hidden border border-mystic-gold shuffle-pulse">
           <img src="/mystic/tarot-card-back.jpg" alt="" class="w-full h-full object-cover" />
         </div>
       </div>
@@ -60,11 +70,12 @@
 </template>
 
 <script setup>
-import { onMounted, ref } from 'vue';
+import { computed, onMounted, ref } from 'vue';
 import api from '../../api/tarot';
 import TarotShell from '../../components/tarot/TarotShell.vue';
 import TarotCard from '../../components/tarot/TarotCard.vue';
 import ReadingResult from '../../components/tarot/ReadingResult.vue';
+import OracleSprite from '../../components/tarot/OracleSprite.vue';
 import { rollReversed, shuffleDeck } from '../../composables/useTarotDeck';
 import { saveJournalEntry } from '../../composables/useTarotJournal';
 
@@ -80,6 +91,31 @@ const advice = ref('');
 const tone = ref('');
 const verdict = ref('');
 const spreadStub = { positions: ['The Answer'], positions_cn: ['答案'] };
+
+const questIndex = computed(() => {
+  if (step.value === 'ask') return 0;
+  if (step.value === 'shuffle' || (step.value === 'reveal' && !revealed.value)) return 1;
+  return 2;
+});
+
+const oraclePose = computed(() => {
+  if (loading.value) return 'divine';
+  if (step.value === 'ask') return 'think';
+  if (step.value === 'shuffle') return 'shuffle';
+  if (verdict.value === 'yes' || verdict.value === 'lean_yes') return 'celebrate';
+  if (verdict.value === 'no' || verdict.value === 'lean_no') return 'surprise';
+  if (revealed.value) return 'look';
+  return 'draw';
+});
+
+const oracleLine = computed(() => {
+  if (loading.value) return '是或否，牌自己会倾斜。我只负责把倾斜读出来。';
+  if (step.value === 'ask') return '只问一件事。牌会给倾向，选择还是你的。';
+  if (step.value === 'shuffle') return '一问一牌。别眨眼。';
+  if (revealed.value && interpretation.value) return '倾向只是风向。走不走，还得你自己迈。';
+  if (step.value === 'reveal') return '点开它。答案在正面，也在你听见的第一句话里。';
+  return '';
+});
 
 onMounted(async () => {
   try {

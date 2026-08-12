@@ -10,9 +10,10 @@
           v-for="spread in group.items"
           :key="spread.id || spread.name"
           type="button"
-          class="relative text-left group cursor-pointer bg-black/40 border border-gray-800 rounded-2xl p-6 hover:border-mystic-gold transition-all duration-300 hover:shadow-xl hover:shadow-mystic-gold/20 hover:-translate-y-1 overflow-hidden"
+          class="relative text-left group cursor-pointer bg-black/40 border border-gray-800 rounded-2xl p-6 pl-10 hover:border-mystic-gold transition-all duration-300 hover:shadow-xl hover:shadow-mystic-gold/20 hover:-translate-y-1 overflow-hidden"
           @click="$emit('select', spread)"
         >
+          <span class="rpg-cursor">▶</span>
           <div class="absolute -top-3 -right-3 bg-mystic-gold text-black text-xs font-bold px-3 py-1.5 rounded-full shadow-lg z-20">
             {{ spread.card_count }} 牌
           </div>
@@ -74,3 +75,23 @@ function difficultyLabel(value) {
   return DIFFICULTY_META[value] || '';
 }
 </script>
+
+<style scoped>
+.rpg-cursor {
+  position: absolute;
+  left: 10px;
+  top: 50%;
+  transform: translateY(-50%);
+  color: transparent;
+  font-size: 12px;
+  z-index: 20;
+}
+.group:hover .rpg-cursor {
+  color: #ffd700;
+  animation: nudge 0.6s ease-in-out infinite;
+}
+@keyframes nudge {
+  0%, 100% { transform: translateY(-50%) translateX(0); }
+  50% { transform: translateY(-50%) translateX(4px); }
+}
+</style>

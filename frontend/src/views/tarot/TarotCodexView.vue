@@ -1,5 +1,9 @@
 <template>
-  <TarotShell>
+  <TarotShell
+    :show-hud="true"
+    oracle-pose="sit"
+    oracle-line="七十八张脸。点开一张，看它的光和影。"
+  >
     <div class="max-w-6xl mx-auto px-4 pb-16">
       <div class="text-center mb-8">
         <p class="text-[10px] tracking-[0.45em] uppercase text-mystic-purple mb-2">Codex</p>

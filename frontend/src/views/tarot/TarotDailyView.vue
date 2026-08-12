@@ -1,5 +1,11 @@
 <template>
-  <TarotShell :show-candle="true">
+  <TarotShell
+    :show-candle="true"
+    :show-hud="true"
+    :oracle-pose="oraclePose"
+    :oracle-line="oracleLine"
+    :oracle-sparkle="loading || !revealed"
+  >
     <div class="max-w-3xl mx-auto px-4 pb-16 flex flex-col items-center text-center">
       <p class="text-[10px] tracking-[0.45em] uppercase text-mystic-purple mb-2">Daily Oracle</p>
       <h2 class="text-3xl sm:text-4xl tracking-widest uppercase glow-text mb-2">今日神谕</h2>
@@ -71,6 +77,24 @@ const interpretation = ref('');
 const summary = ref('');
 const advice = ref('');
 const tone = ref('');
+
+const oraclePose = computed(() => {
+  if (error.value) return 'think';
+  if (!daily.value) return 'meditate';
+  if (loading.value) return 'divine';
+  if (interpretation.value) return 'celebrate';
+  if (revealed.value) return 'look';
+  return 'draw';
+});
+
+const oracleLine = computed(() => {
+  if (error.value) return '今日的牌还没到。晚点再来找我。';
+  if (!daily.value) return '我去把今天那张请出来……';
+  if (loading.value) return '今天这张牌话有点密。等我听完。';
+  if (interpretation.value) return '同一天不会换脸。明天再来，才是下一张。';
+  if (revealed.value) return `${daily.value.card.name_cn}。要不要让我把今日的话翻译给你听？`;
+  return '今天只给一张。点它，让它翻过来。';
+});
 
 const dateLabel = computed(() => {
   const iso = daily.value?.date;

@@ -1,15 +1,22 @@
 <template>
-  <TarotShell :show-candle="step === 'pick' || step === 'reveal'">
-    <div class="w-full max-w-6xl mx-auto flex flex-col items-center px-4 pb-16">
-      <div class="text-center my-4 sm:my-6">
-        <h2 class="text-2xl sm:text-3xl mb-2 tracking-widest uppercase glow-text">The Ritual</h2>
-        <p class="text-gray-400 text-sm italic h-6 font-chinese-body">{{ stepHint }}</p>
+  <TarotShell
+    :show-candle="step === 'pick' || step === 'reveal'"
+    :show-hud="true"
+    :oracle-pose="oraclePose"
+    :oracle-line="oracleLine"
+    :oracle-sparkle="step === 'shuffle' || loadingAI"
+    :quest="ritualQuest"
+    :quest-index="questIndex"
+  >
+    <div class="w-full max-w-6xl mx-auto flex flex-col items-center px-4 pb-6">
+      <div class="text-center my-3 sm:my-4">
+        <h2 class="text-2xl sm:text-3xl mb-1 tracking-widest uppercase glow-text">The Ritual</h2>
       </div>
 
       <div class="w-full min-h-[560px] flex flex-col items-center justify-start pt-2">
         <transition name="smooth" mode="out-in">
           <div v-if="step === 'spread'" key="spread" class="w-full flex flex-col items-center">
-            <h3 class="text-lg text-gray-300 mb-6 tracking-widest uppercase">选择牌阵</h3>
+            <h3 class="text-lg text-gray-300 mb-6 tracking-widest uppercase">选择阵法</h3>
             <SpreadSelector :spreads="spreads" @select="selectSpread" />
           </div>
 
@@ -47,6 +54,7 @@
           </div>
 
           <div v-else-if="step === 'shuffle'" key="shuffle" class="w-full h-80 flex flex-col items-center justify-center relative">
+            <OracleSprite pose="shuffle" size="lg" :sparkle="true" class="mb-2" />
             <div class="relative w-40 h-60 sm:w-48 sm:h-72 shuffle-container">
               <div
                 v-for="index in 10"
@@ -147,6 +155,7 @@ import SpreadSelector from '../../components/tarot/SpreadSelector.vue';
 import SpreadLayout from '../../components/tarot/SpreadLayout.vue';
 import ReadingResult from '../../components/tarot/ReadingResult.vue';
 import TarotShell from '../../components/tarot/TarotShell.vue';
+import OracleSprite from '../../components/tarot/OracleSprite.vue';
 import { positionLabel, rollReversed, shuffleDeck } from '../../composables/useTarotDeck';
 import { saveJournalEntry, snapshotCards } from '../../composables/useTarotJournal';
 
@@ -194,15 +203,38 @@ onUnmounted(() => {
 const displayCardCount = computed(() => shuffledDeck.value.length);
 const remainingPicks = computed(() => (selectedSpread.value?.card_count || 3) - drawnCards.value.length);
 const allRevealed = computed(() => drawnCards.value.length > 0 && drawnCards.value.every((c) => c.revealed));
-const stepHint = computed(() => {
+const ritualQuest = ['选阵', '提问', '洗牌', '抽牌', '神谕'];
+
+const questIndex = computed(() => {
   switch (step.value) {
-    case 'spread': return '选一种问法，决定故事有多深…';
-    case 'input': return '把注意力放进问题里';
-    case 'shuffle': return '';
-    case 'pick': return '凭直觉抽牌，不必解释为什么是这一张';
-    case 'reveal': return '一张一张翻开，让牌自己说话';
-    default: return '';
+    case 'spread': return 0;
+    case 'input': return 1;
+    case 'shuffle': return 2;
+    case 'pick': return 3;
+    default: return 4;
   }
+});
+
+const oraclePose = computed(() => {
+  if (loadingAI.value) return 'divine';
+  if (step.value === 'spread') return 'draw';
+  if (step.value === 'input') return 'think';
+  if (step.value === 'shuffle') return 'shuffle';
+  if (step.value === 'pick') return 'spread';
+  if (allRevealed.value && aiInterpretation.value) return 'celebrate';
+  if (step.value === 'reveal') return 'look';
+  return 'idle';
+});
+
+const oracleLine = computed(() => {
+  if (loadingAI.value) return '……我在听牌说话。先别打断。';
+  if (step.value === 'spread') return '先选阵法。问得越深，牌就越多。';
+  if (step.value === 'input') return `「${selectedSpread.value?.name_cn || '这阵'}」。把问题说清楚，含糊的问只会得到含糊的牌。`;
+  if (step.value === 'shuffle') return '别盯着我的手。运气不喜欢被监视。';
+  if (step.value === 'pick') return `凭手热去抽。还要 ${remainingPicks.value} 张 · ${positionLabel(selectedSpread.value, drawnCards.value.length)}。`;
+  if (allRevealed.value && aiInterpretation.value) return '记下你听见的。下次来，对照着看。';
+  if (step.value === 'reveal') return '一张一张翻。别一次看完，故事会碎。';
+  return '';
 });
 
 function selectSpread(spread) {
