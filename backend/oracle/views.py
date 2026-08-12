@@ -1,104 +1,165 @@
-from rest_framework.views import APIView
-from rest_framework.response import Response
+from datetime import date, datetime
+
 from rest_framework import status
-import os
-import requests
-import re
+from rest_framework.response import Response
+from rest_framework.views import APIView
+
+from cards.meanings import enrich_card, meaning_for
+from cards.models import TarotCard
+from cards.serializers import TarotCardSerializer
+from readings.models import Reading, ReadingCard, Spread
+
+from .services import (
+    build_prompt,
+    consult_oracle,
+    pick_daily_index,
+    pick_daily_reversed,
+    polarity_verdict,
+)
+
+
+def _normalize_cards(raw_cards):
+    normalized = []
+    for item in raw_cards or []:
+        if not isinstance(item, dict):
+            continue
+        name = (item.get("name") or "").strip()
+        if not name:
+            continue
+        reversed_ = bool(item.get("reversed") or item.get("is_reversed"))
+        normalized.append(
+            {
+                "name": name,
+                "name_cn": item.get("name_cn") or "",
+                "position": item.get("position") or "",
+                "position_cn": item.get("position_cn") or "",
+                "reversed": reversed_,
+                "is_reversed": reversed_,
+                "keywords": item.get("keywords") or [],
+                "meaning": item.get("meaning") or meaning_for(name, reversed_),
+            }
+        )
+    return normalized
+
+
+def _persist_reading(question, spread, spread_type, mode, result, cards):
+    reading = Reading.objects.create(
+        question=question,
+        spread=spread,
+        spread_type=spread_type or (spread.name if spread else "reading"),
+        mode=mode,
+        ai_interpretation=result.get("interpretation") or "",
+        ai_summary=result.get("summary") or "",
+        ai_advice=result.get("advice") or "",
+        tone=result.get("tone") or "",
+        verdict=result.get("verdict") or "",
+    )
+    for index, item in enumerate(cards):
+        db_card = TarotCard.objects.filter(name=item["name"]).first()
+        if not db_card:
+            continue
+        ReadingCard.objects.create(
+            reading=reading,
+            card=db_card,
+            position_index=index,
+            position_name=item.get("position_cn") or item.get("position") or f"Position {index + 1}",
+            is_reversed=bool(item.get("reversed")),
+        )
+    return reading
+
 
 class DivinationView(APIView):
     def post(self, request):
-        question = request.data.get('question')
-        cards_data = request.data.get('cards') # List of {name, position, meaning}
-        spread_type = request.data.get('spread_type', 'reading')
-        
+        question = (request.data.get("question") or "").strip()
+        cards_data = request.data.get("cards")
+        spread_type = request.data.get("spread_type") or "reading"
+        mode = (request.data.get("mode") or "ritual").strip().lower()
+        if mode not in {"ritual", "daily", "yesno"}:
+            mode = "ritual"
+
         if not question or not cards_data:
-            return Response({"error": "Missing question or cards"}, status=status.HTTP_400_BAD_REQUEST)
-
-        # Build card list for unified prompt
-        card_list = ", ".join([f"{c['name']} ({c['position']})" for c in cards_data])
-        
-        # Prompt for unified narrative PLUS simple summary
-        prompt = f"""The Querent asks: "{question}"
-
-Cards drawn: {card_list}
-
-Provide your reading in TWO parts:
-
-**PART 1 - MYSTICAL INTERPRETATION:**
-Provide a flowing, unified interpretation that weaves all the cards together into ONE cohesive narrative. 
-DO NOT list each card separately with headers. Tell the story naturally, incorporating what each card reveals as part of a continuous flow.
-Keep it mystical, insightful, and under 150 words.
-
-**PART 2 - SIMPLE SUMMARY (用中文):**
-用简单易懂的中文写一个2-3句话的总结，直接说明：
-1. 当前情况怎么样
-2. 应该怎么做
-3. 最终结果会如何
-
-格式:
----INTERPRETATION---
-(English mystical interpretation here)
----SUMMARY---
-(中文简明总结)"""
-
-        api_key = os.environ.get("DEEPSEEK_API_KEY")
-        if not api_key:
-            # Mock response if no key
-            return Response({
-                "interpretation": "The mists part to reveal your path... The cards speak of transformation and new beginnings. Trust in the journey ahead.",
-                "summary": "目前正处于转变期，保持开放心态，迎接新机遇。相信自己的直觉，前方的道路会逐渐明朗。"
-            })
-
-        try:
-            response = requests.post(
-                "https://api.deepseek.com/v1/chat/completions",
-                headers={
-                    "Authorization": f"Bearer {api_key}",
-                    "Content-Type": "application/json"
-                },
-                json={
-                    "model": "deepseek-v4-flash",
-                    "messages": [
-                        {"role": "system", "content": "You are a mystical Tarot Reader. Provide unified, flowing interpretations with a simple Chinese summary. Follow the exact format requested."},
-                        {"role": "user", "content": prompt}
-                    ],
-                    "max_tokens": 500,
-                    "thinking": {"type": "disabled"}
-                }
+            return Response(
+                {"error": "Missing question or cards"},
+                status=status.HTTP_400_BAD_REQUEST,
             )
-            response.raise_for_status()
-            ai_text = response.json()['choices'][0]['message']['content']
-            
-            # Parse interpretation and summary
-            interpretation = ai_text
-            summary = ""
-            
-            if "---INTERPRETATION---" in ai_text and "---SUMMARY---" in ai_text:
-                parts = ai_text.split("---SUMMARY---")
-                interpretation = parts[0].replace("---INTERPRETATION---", "").strip()
-                summary = parts[1].strip() if len(parts) > 1 else ""
-            elif "SUMMARY" in ai_text or "总结" in ai_text:
-                # Fallback parsing
-                lines = ai_text.split("\n")
-                summary_start = False
-                summary_lines = []
-                interp_lines = []
-                for line in lines:
-                    if "SUMMARY" in line.upper() or "总结" in line:
-                        summary_start = True
-                        continue
-                    if summary_start:
-                        summary_lines.append(line)
-                    else:
-                        interp_lines.append(line)
-                interpretation = "\n".join(interp_lines).strip()
-                summary = "\n".join(summary_lines).strip()
-            
-            return Response({
-                "interpretation": interpretation,
-                "summary": summary if summary else "牌阵揭示了你当前所面临的情况，建议保持积极的态度，相信自己的选择。"
-            })
-            
-        except Exception as e:
-            return Response({"error": str(e)}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
 
+        cards = _normalize_cards(cards_data)
+        if not cards:
+            return Response(
+                {"error": "No valid cards provided"},
+                status=status.HTTP_400_BAD_REQUEST,
+            )
+
+        spread = Spread.objects.filter(name=spread_type).first()
+        spread_name_cn = ""
+        if spread:
+            spread_name_cn = spread.name_cn
+            for i, card in enumerate(cards):
+                if not card["position"] and i < len(spread.positions):
+                    card["position"] = spread.positions[i]
+                if not card["position_cn"] and i < len(spread.positions_cn or []):
+                    card["position_cn"] = spread.positions_cn[i]
+
+        prompt = build_prompt(
+            question=question,
+            cards=cards,
+            spread_type=spread_type,
+            spread_name_cn=spread_name_cn,
+            mode=mode,
+        )
+        result = consult_oracle(prompt, mode=mode)
+
+        if mode == "yesno" and not result.get("verdict"):
+            result["verdict"] = polarity_verdict(cards)
+
+        reading = _persist_reading(question, spread, spread_type, mode, result, cards)
+
+        return Response(
+            {
+                "interpretation": result["interpretation"],
+                "summary": result["summary"],
+                "advice": result["advice"],
+                "tone": result["tone"],
+                "verdict": result.get("verdict") or "",
+                "reading_id": reading.id,
+            }
+        )
+
+
+class DailyOracleView(APIView):
+    def get(self, request):
+        raw_date = (request.query_params.get("date") or "").strip()
+        if raw_date:
+            try:
+                day = datetime.strptime(raw_date, "%Y-%m-%d").date()
+            except ValueError:
+                return Response(
+                    {"error": "Invalid date, expected YYYY-MM-DD"},
+                    status=status.HTTP_400_BAD_REQUEST,
+                )
+        else:
+            day = date.today()
+
+        qs = TarotCard.objects.all().order_by("arcana", "suit", "number", "id")
+        n = qs.count()
+        if n == 0:
+            return Response(
+                {"error": "No cards in the deck"},
+                status=status.HTTP_503_SERVICE_UNAVAILABLE,
+            )
+
+        index = pick_daily_index(day, n)
+        card = qs[index]
+        reversed_ = pick_daily_reversed(day)
+        payload = enrich_card(TarotCardSerializer(card).data)
+        meaning = meaning_for(card.name, reversed_)
+
+        return Response(
+            {
+                "date": day.isoformat(),
+                "card": payload,
+                "reversed": reversed_,
+                "meaning": meaning,
+                "keywords": payload.get("keywords") or [],
+            }
+        )

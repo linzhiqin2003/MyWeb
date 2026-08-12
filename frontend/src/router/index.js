@@ -22,6 +22,10 @@ const QuestionGenView = () => import('../views/QuestionGenView.vue')
 const PortfolioHomeView = () => import('../views/PortfolioHomeView.vue')
 const TarotSanctumView = () => import('../views/tarot/TarotSanctumView.vue')
 const TarotRitualView = () => import('../views/tarot/TarotRitualView.vue')
+const TarotDailyView = () => import('../views/tarot/TarotDailyView.vue')
+const TarotYesNoView = () => import('../views/tarot/TarotYesNoView.vue')
+const TarotCodexView = () => import('../views/tarot/TarotCodexView.vue')
+const TarotJournalView = () => import('../views/tarot/TarotJournalView.vue')
 
 // 默认站点标题
 const DEFAULT_TITLE = 'LZQ的个人空间'
@@ -176,6 +180,30 @@ const router = createRouter({
       name: 'tarot-ritual',
       component: TarotRitualView,
       meta: { title: 'Tarot Ritual | LZQ' }
+    },
+    {
+      path: '/tarot/daily',
+      name: 'tarot-daily',
+      component: TarotDailyView,
+      meta: { title: '今日神谕 | Tarot Sanctum' }
+    },
+    {
+      path: '/tarot/yesno',
+      name: 'tarot-yesno',
+      component: TarotYesNoView,
+      meta: { title: '是非一问 | Tarot Sanctum' }
+    },
+    {
+      path: '/tarot/codex',
+      name: 'tarot-codex',
+      component: TarotCodexView,
+      meta: { title: '星图典藏 | Tarot Sanctum' }
+    },
+    {
+      path: '/tarot/journal',
+      name: 'tarot-journal',
+      component: TarotJournalView,
+      meta: { title: '占卜手记 | Tarot Sanctum' }
     },
 
   ]
