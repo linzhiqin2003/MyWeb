@@ -1,4 +1,3 @@
-import json
 from django.core.management.base import BaseCommand
 from readings.models import Spread
 
@@ -6,102 +5,284 @@ SPREADS = [
     {
         "name": "single_card",
         "name_cn": "每日一牌",
-        "description": "Draw a single card for daily guidance or a quick insight into a specific question.",
+        "description": "A single card for daily guidance or a focused question.",
+        "description_cn": "一枚牌，一面镜子。适合每日指引，或把一个问题收到最简的答案里。",
         "card_count": 1,
         "positions": ["The Message"],
-        "layout": [{"row": 0, "col": 0}]
+        "positions_cn": ["神谕"],
+        "layout": [{"x": 50, "y": 50}],
+        "category": Spread.Category.GLANCE,
+        "difficulty": Spread.Difficulty.BEGINNER,
+        "allow_reversed": True,
+        "sort_order": 10,
+        "blurb": "一问一答，今日的那张脸",
+    },
+    {
+        "name": "yes_no",
+        "name_cn": "是非一问",
+        "description": "One card to lean yes, no, or unclear — with the story behind the tilt.",
+        "description_cn": "只问是或否。牌会给出倾向，以及为什么宇宙不肯给你一句干脆的话。",
+        "card_count": 1,
+        "positions": ["The Answer"],
+        "positions_cn": ["答案"],
+        "layout": [{"x": 50, "y": 50}],
+        "category": Spread.Category.GLANCE,
+        "difficulty": Spread.Difficulty.BEGINNER,
+        "allow_reversed": True,
+        "sort_order": 20,
+        "blurb": "是、否，或迷雾",
     },
     {
         "name": "three_card",
-        "name_cn": "三牌阵",
-        "description": "A classic spread exploring Past, Present, and Future aspects of your question.",
+        "name_cn": "三牌阵 · 时间之河",
+        "description": "Past, Present, and Future of your question.",
+        "description_cn": "经典三牌：来处、此刻、将往。看一条问题如何在时间里转弯。",
         "card_count": 3,
         "positions": ["The Past", "The Present", "The Future"],
-        "layout": [{"row": 0, "col": 0}, {"row": 0, "col": 1}, {"row": 0, "col": 2}]
+        "positions_cn": ["过去", "现在", "未来"],
+        "layout": [{"x": 22, "y": 50}, {"x": 50, "y": 50}, {"x": 78, "y": 50}],
+        "category": Spread.Category.CLASSIC,
+        "difficulty": Spread.Difficulty.BEGINNER,
+        "allow_reversed": True,
+        "sort_order": 30,
+        "blurb": "过去 · 现在 · 未来",
+    },
+    {
+        "name": "situation_action_outcome",
+        "name_cn": "处境 · 行动 · 结果",
+        "description": "What is happening, what to do, and where it leads.",
+        "description_cn": "不谈命运谈策略：事情本身、你可以做的、以及那条路通向哪里。",
+        "card_count": 3,
+        "positions": ["Situation", "Action", "Outcome"],
+        "positions_cn": ["处境", "行动", "结果"],
+        "layout": [{"x": 22, "y": 50}, {"x": 50, "y": 50}, {"x": 78, "y": 50}],
+        "category": Spread.Category.CLASSIC,
+        "difficulty": Spread.Difficulty.BEGINNER,
+        "allow_reversed": True,
+        "sort_order": 40,
+        "blurb": "看清局面，再出手",
     },
     {
         "name": "cross",
         "name_cn": "十字牌阵",
-        "description": "A five-card spread forming a cross, providing a deeper analysis of your situation.",
+        "description": "A five-card cross: present, challenge, foundation, past, future.",
+        "description_cn": "五张牌围成十字：此刻、阻力、根基、来处与将往，比三牌更深一层。",
         "card_count": 5,
         "positions": [
             "Present Situation",
             "Challenge",
             "Foundation",
             "Past Influence",
-            "Future Potential"
+            "Future Potential",
         ],
+        "positions_cn": ["此刻", "阻力", "根基", "来处", "将往"],
         "layout": [
-            {"row": 1, "col": 1},  # Center
-            {"row": 0, "col": 1},  # Top
-            {"row": 2, "col": 1},  # Bottom
-            {"row": 1, "col": 0},  # Left
-            {"row": 1, "col": 2}   # Right
-        ]
+            {"x": 50, "y": 50},
+            {"x": 50, "y": 18},
+            {"x": 50, "y": 82},
+            {"x": 22, "y": 50},
+            {"x": 78, "y": 50},
+        ],
+        "category": Spread.Category.DEPTH,
+        "difficulty": Spread.Difficulty.INTERMEDIATE,
+        "allow_reversed": True,
+        "sort_order": 50,
+        "blurb": "十字里的五种力量",
     },
     {
-        "name": "celtic_cross",
-        "name_cn": "凯尔特十字",
-        "description": "The most comprehensive 10-card spread, revealing all aspects of your question with great depth.",
-        "card_count": 10,
-        "positions": [
-            "Present",
-            "Challenge",
-            "Distant Past",
-            "Recent Past",
-            "Best Outcome",
-            "Near Future",
-            "Self",
-            "Environment",
-            "Hopes & Fears",
-            "Final Outcome"
-        ],
+        "name": "decision",
+        "name_cn": "抉择分叉",
+        "description": "You, Path A, Path B, advice, and the likely harvest.",
+        "description_cn": "站在岔路口：你是谁、A 路、B 路、该听的劝，以及无论怎么选都会遇见的课题。",
+        "card_count": 5,
+        "positions": ["You", "Path A", "Path B", "Advice", "The Lesson"],
+        "positions_cn": ["你", "A 之路", "B 之路", "劝诫", "课题"],
         "layout": [
-            {"row": 2, "col": 1},  # 1 Present
-            {"row": 2, "col": 1, "overlay": True},  # 2 Challenge (crosses 1)
-            {"row": 4, "col": 1},  # 3 Distant Past
-            {"row": 2, "col": 0},  # 4 Recent Past
-            {"row": 0, "col": 1},  # 5 Best Outcome
-            {"row": 2, "col": 2},  # 6 Near Future
-            {"row": 4, "col": 3},  # 7 Self
-            {"row": 3, "col": 3},  # 8 Environment
-            {"row": 2, "col": 3},  # 9 Hopes & Fears
-            {"row": 1, "col": 3}   # 10 Final Outcome
-        ]
+            {"x": 50, "y": 52},
+            {"x": 22, "y": 28},
+            {"x": 78, "y": 28},
+            {"x": 50, "y": 82},
+            {"x": 50, "y": 14},
+        ],
+        "category": Spread.Category.DECISION,
+        "difficulty": Spread.Difficulty.INTERMEDIATE,
+        "allow_reversed": True,
+        "sort_order": 60,
+        "blurb": "两条路，一个你",
     },
     {
         "name": "relationship",
         "name_cn": "关系牌阵",
-        "description": "A six-card spread designed to explore the dynamics of a relationship.",
+        "description": "Six cards mapping you, the other, the bond, the snag, advice, outcome.",
+        "description_cn": "你、对方、连结、卡点、劝诫与走向。把一段关系摊在桌上，而不是只问「爱不爱」。",
         "card_count": 6,
+        "positions": ["You", "The Other", "The Bond", "The Challenge", "Advice", "Outcome"],
+        "positions_cn": ["你", "对方", "连结", "卡点", "劝诫", "走向"],
+        "layout": [
+            {"x": 22, "y": 26},
+            {"x": 78, "y": 26},
+            {"x": 50, "y": 26},
+            {"x": 50, "y": 54},
+            {"x": 22, "y": 82},
+            {"x": 78, "y": 82},
+        ],
+        "category": Spread.Category.RELATION,
+        "difficulty": Spread.Difficulty.INTERMEDIATE,
+        "allow_reversed": True,
+        "sort_order": 70,
+        "blurb": "两个人之间的磁场",
+    },
+    {
+        "name": "horseshoe",
+        "name_cn": "马蹄铁",
+        "description": "Seven-card arc covering past through outcome, including the hidden and the environment.",
+        "description_cn": "七张牌沿弧展开：过去到结果，含隐秘因素与周围环境。比十字更会讲故事。",
+        "card_count": 7,
         "positions": [
-            "You",
-            "Your Partner",
-            "The Connection",
-            "The Challenge",
-            "Advice",
-            "Outcome"
+            "Past",
+            "Present",
+            "Hidden",
+            "The Self",
+            "Environment",
+            "Hopes & Fears",
+            "Outcome",
+        ],
+        "positions_cn": ["过去", "现在", "隐秘", "自我", "环境", "希冀与惧", "结果"],
+        "layout": [
+            {"x": 8, "y": 62},
+            {"x": 22, "y": 38},
+            {"x": 36, "y": 22},
+            {"x": 50, "y": 16},
+            {"x": 64, "y": 22},
+            {"x": 78, "y": 38},
+            {"x": 92, "y": 62},
+        ],
+        "category": Spread.Category.DEPTH,
+        "difficulty": Spread.Difficulty.INTERMEDIATE,
+        "allow_reversed": True,
+        "sort_order": 80,
+        "blurb": "七步弧光，看见隐秘",
+    },
+    {
+        "name": "shadow",
+        "name_cn": "阴影工作",
+        "description": "Persona, shadow, the wound, and the integration.",
+        "description_cn": "面向内在：面具、阴影、旧伤，以及如何把它们炼成力量。适合不问「会怎样」而问「我是谁」。",
+        "card_count": 4,
+        "positions": ["Persona", "Shadow", "The Wound", "Integration"],
+        "positions_cn": ["面具", "阴影", "旧伤", "整合"],
+        "layout": [
+            {"x": 30, "y": 30},
+            {"x": 70, "y": 30},
+            {"x": 30, "y": 72},
+            {"x": 70, "y": 72},
+        ],
+        "category": Spread.Category.INNER,
+        "difficulty": Spread.Difficulty.ADVANCED,
+        "allow_reversed": True,
+        "sort_order": 90,
+        "blurb": "把看不见的那面翻过来",
+    },
+    {
+        "name": "elemental",
+        "name_cn": "四元素",
+        "description": "Fire, Water, Air, Earth — will, feeling, mind, and the body of the matter.",
+        "description_cn": "火（意志）水（情感）风（心智）土（物质）。看问题在四个世界里各缺什么。",
+        "card_count": 4,
+        "positions": ["Fire · Will", "Water · Feeling", "Air · Mind", "Earth · Matter"],
+        "positions_cn": ["火 · 意志", "水 · 情感", "风 · 心智", "土 · 物质"],
+        "layout": [
+            {"x": 50, "y": 16},
+            {"x": 78, "y": 50},
+            {"x": 22, "y": 50},
+            {"x": 50, "y": 84},
+        ],
+        "category": Spread.Category.INNER,
+        "difficulty": Spread.Difficulty.INTERMEDIATE,
+        "allow_reversed": True,
+        "sort_order": 100,
+        "blurb": "意志、情感、心智、物质",
+    },
+    {
+        "name": "year_ahead",
+        "name_cn": "四季流年",
+        "description": "Four cards for the coming year, one per season.",
+        "description_cn": "春生、夏长、秋收、冬藏。不问某一天，问这一年的气候。",
+        "card_count": 4,
+        "positions": ["Spring", "Summer", "Autumn", "Winter"],
+        "positions_cn": ["春 · 生", "夏 · 长", "秋 · 收", "冬 · 藏"],
+        "layout": [
+            {"x": 16, "y": 50},
+            {"x": 39, "y": 50},
+            {"x": 61, "y": 50},
+            {"x": 84, "y": 50},
+        ],
+        "category": Spread.Category.TIMING,
+        "difficulty": Spread.Difficulty.BEGINNER,
+        "allow_reversed": True,
+        "sort_order": 110,
+        "blurb": "一年的四种天气",
+    },
+    {
+        "name": "celtic_cross",
+        "name_cn": "凯尔特十字",
+        "description": "The classic ten-card spread: the cross of the matter and the staff of becoming.",
+        "description_cn": "十张牌的完整叙事：十字看事情本身，权杖看你如何穿过它。最深、也最需要耐心翻开。",
+        "card_count": 10,
+        "positions": [
+            "Present",
+            "Challenge",
+            "Foundation",
+            "Recent Past",
+            "Crown",
+            "Near Future",
+            "Self",
+            "Environment",
+            "Hopes & Fears",
+            "Outcome",
+        ],
+        "positions_cn": [
+            "现状",
+            "挑战",
+            "根基",
+            "近过去",
+            "理想",
+            "近未来",
+            "自我",
+            "环境",
+            "希冀与惧",
+            "结局",
         ],
         "layout": [
-            {"row": 0, "col": 0},  # You
-            {"row": 0, "col": 2},  # Partner
-            {"row": 1, "col": 1},  # Connection
-            {"row": 2, "col": 1},  # Challenge
-            {"row": 3, "col": 0},  # Advice
-            {"row": 3, "col": 2}   # Outcome
-        ]
-    }
+            {"x": 32, "y": 46},
+            {"x": 32, "y": 46, "rotate": 90, "overlay": True},
+            {"x": 32, "y": 78},
+            {"x": 12, "y": 46},
+            {"x": 32, "y": 14},
+            {"x": 52, "y": 46},
+            {"x": 80, "y": 84},
+            {"x": 80, "y": 60},
+            {"x": 80, "y": 36},
+            {"x": 80, "y": 12},
+        ],
+        "category": Spread.Category.DEPTH,
+        "difficulty": Spread.Difficulty.ADVANCED,
+        "allow_reversed": True,
+        "sort_order": 120,
+        "blurb": "十字与权杖，完整的故事",
+    },
 ]
 
+
 class Command(BaseCommand):
-    help = 'Populate Spread types'
+    help = "Populate / refresh tarot spread types"
 
     def handle(self, *args, **options):
         for spread_data in SPREADS:
             Spread.objects.update_or_create(
-                name=spread_data['name'],
-                defaults=spread_data
+                name=spread_data["name"],
+                defaults=spread_data,
             )
             self.stdout.write(f"Created/Updated: {spread_data['name']}")
-        
-        self.stdout.write(self.style.SUCCESS(f'Successfully populated {len(SPREADS)} spreads'))
+
+        self.stdout.write(self.style.SUCCESS(f"Successfully populated {len(SPREADS)} spreads"))

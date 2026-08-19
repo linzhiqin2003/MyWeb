@@ -18,11 +18,15 @@ const tarotApi = {
   getSpreads() {
     return apiClient.get('/spreads/');
   },
-  divine(question, cards, spreadType) {
+  getDaily(date) {
+    return apiClient.get('/daily/', { params: date ? { date } : {} });
+  },
+  divine(question, cards, spreadType, mode = 'ritual') {
     return apiClient.post('/divine/', {
       question,
       cards,
       spread_type: spreadType,
+      mode,
     });
   },
 };

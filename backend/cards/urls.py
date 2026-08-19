@@ -6,7 +6,7 @@ from .serializers import TarotCardSerializer
 
 class TarotCardViewSet(viewsets.ReadOnlyModelViewSet):
     """ViewSet for listing and retrieving tarot cards."""
-    queryset = TarotCard.objects.all()
+    queryset = TarotCard.objects.all().order_by("arcana", "suit", "number", "id")
     serializer_class = TarotCardSerializer
 
 router = DefaultRouter()
