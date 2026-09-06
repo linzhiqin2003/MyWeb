@@ -173,37 +173,37 @@ const router = createRouter({
       path: '/tarot',
       name: 'tarot',
       component: TarotSanctumView,
-      meta: { title: 'Tarot Sanctum | LZQ' }
+      meta: { public: true, title: 'Tarot Sanctum | LZQ' }
     },
     {
       path: '/tarot/ritual',
       name: 'tarot-ritual',
       component: TarotRitualView,
-      meta: { title: 'Tarot Ritual | LZQ' }
+      meta: { public: true, title: 'Tarot Ritual | LZQ' }
     },
     {
       path: '/tarot/daily',
       name: 'tarot-daily',
       component: TarotDailyView,
-      meta: { title: '今日神谕 | Tarot Sanctum' }
+      meta: { public: true, title: '今日神谕 | Tarot Sanctum' }
     },
     {
       path: '/tarot/yesno',
       name: 'tarot-yesno',
       component: TarotYesNoView,
-      meta: { title: '是非一问 | Tarot Sanctum' }
+      meta: { public: true, title: '是非一问 | Tarot Sanctum' }
     },
     {
       path: '/tarot/codex',
       name: 'tarot-codex',
       component: TarotCodexView,
-      meta: { title: '星图典藏 | Tarot Sanctum' }
+      meta: { public: true, title: '星图典藏 | Tarot Sanctum' }
     },
     {
       path: '/tarot/journal',
       name: 'tarot-journal',
       component: TarotJournalView,
-      meta: { title: '占卜手记 | Tarot Sanctum' }
+      meta: { public: true, title: '占卜手记 | Tarot Sanctum' }
     },
 
   ]
