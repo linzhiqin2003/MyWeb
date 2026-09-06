@@ -64,6 +64,33 @@ cd ~/KitchenBook/receipts-frontend
 npm install --silent
 npm run build
 
+echo -e "${YELLOW}🌐 6.2 同步 Nginx 配置...${NC}"
+# 仓库里的 deploy/nginx.conf 长期是「孤儿模板」：部署从不拷贝它，生产的
+# /etc/nginx/conf.d/kitchenbook.conf 全靠手工 scp/sed 维护，两边随时可能悄悄分叉。
+# 这里让它成为唯一事实来源，但只在真有差异时动手，且先备份、再 nginx -t，
+# 校验不过立刻回滚 —— 宁可不部署，也不能把线上 nginx 改坏。
+NGINX_SRC=~/KitchenBook/deploy/nginx.conf
+NGINX_DST=/etc/nginx/conf.d/kitchenbook.conf
+if [ ! -f "$NGINX_DST" ]; then
+    echo -e "${RED}✗ 找不到 $NGINX_DST，跳过同步（请先确认生产 nginx 配置路径）${NC}"
+elif sudo cmp -s "$NGINX_SRC" "$NGINX_DST"; then
+    echo -e "${GREEN}✓ Nginx 配置已是最新，无需改动${NC}"
+else
+    NGINX_BAK="$NGINX_DST.bak.$(date -u +%Y%m%dT%H%M%SZ)"
+    echo -e "${YELLOW}⚠️  检测到差异，备份到 $NGINX_BAK 后覆盖${NC}"
+    sudo diff -u "$NGINX_DST" "$NGINX_SRC" || true
+    sudo cp -p "$NGINX_DST" "$NGINX_BAK"
+    sudo cp "$NGINX_SRC" "$NGINX_DST"
+    if sudo nginx -t; then
+        echo -e "${GREEN}✓ Nginx 配置校验通过${NC}"
+    else
+        echo -e "${RED}✗ Nginx 配置校验失败，已回滚到 $NGINX_BAK${NC}"
+        sudo cp -p "$NGINX_BAK" "$NGINX_DST"
+        sudo nginx -t || true
+        exit 1
+    fi
+fi
+
 echo -e "${YELLOW}🔄 7. 重启服务...${NC}"
 # 游戏模块已下线；清理旧部署中可能仍启用的 Daphne 服务。
 if systemctl list-unit-files daphne.service --no-legend 2>/dev/null | grep -q '^daphne.service'; then
