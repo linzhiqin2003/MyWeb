@@ -105,24 +105,31 @@ cd receipts-frontend && npm run dev # http://localhost:5174
 
 - **域名**: www.lzqqq.org
 - **连接**: `ssh myserver`
+- **服务器上的项目路径**: `~/KitchenBook`（**不是** `~/MyWeb`，仓库改过名，服务器目录没跟着改）
 - **部署脚本**: `deploy/` 目录（deploy.sh, nginx.conf, gunicorn.service 等）
-- **服务器上已有项目和部署脚本**，每次代码更新后需要重新部署
 
-### 部署流程
+### 部署流程：push 就够，不要手动跑脚本
 
-1. 本地完成开发，构建前端：
-   ```bash
-   cd frontend && npm run build
-   cd receipts-frontend && npm run build
-   ```
-2. 推送代码到远程仓库
-3. SSH 到服务器执行部署脚本：
-   ```bash
-   ssh myserver
-   cd ~/MyWeb  # 或项目实际路径
-   git pull
-   bash deploy/deploy.sh
-   ```
+`.github/workflows/deploy.yml` 已配置**自动部署**：push 到 `main` → 跑 Django 测试 → 用 `kitchenbook-ci-deploy` 密钥 SSH 到服务器执行 `bash deploy/deploy.sh`。整个过程约 1m45s。
+
+```bash
+git push origin main    # 这就是全部
+```
+
+- **不需要本地 `npm run build`** —— `deploy.sh` 第 6 步在服务器上构建双前端
+- **不要再手动 `ssh myserver 'bash deploy/deploy.sh'`** —— 与 CI 并发跑同一个工作树（`git stash` + `pull` + `npm build`）有互相踩的风险
+- 查看部署结果：`gh run list --limit 5`，失败时 `gh run view <id> --log-failed`
+- CI runner 在 Azure 上，每次出口 IP 都不同 —— 服务器 SSH 日志里那些陌生的 `20.x / 48.x / 52.x` 登录**是 CI，不是入侵**
+
+### 手动部署（仅应急：CI 挂了、或要在服务器上现场调试）
+
+```bash
+ssh myserver
+cd ~/KitchenBook
+bash deploy/deploy.sh
+```
+
+⚠️ `bash deploy/deploy.sh` 会在第 1 步 `git pull` 里换掉脚本自己，但当前这一轮 bash 读的仍是**已打开的旧文件**——**改动 deploy.sh 后，新步骤要下一次部署才生效**。
 
 ## 进展记录
 
@@ -132,7 +139,9 @@ cd receipts-frontend && npm run dev # http://localhost:5174
 - **本地 main 曾落后 origin/main 4 个提交**（PR #3 只在远端和服务器上，本地从没 pull）。rebase 对齐，手工解掉 `deploy/nginx.conf` 冲突：保留 `/mystic/`，接上拆分后的 `/login` + `/tarot` location
 - **今日神谕改按访客本地日期取牌**（commit `47d1e1c`）：Django 会把进程 TZ 设成 `settings.TIME_ZONE`（= UTC），所以 `oracle/views.py` 的 `date.today()` 返回 UTC 日期，UTC+8 用户每天 08:00 前拿到的都是昨天那张牌。改在前端传 `localToday()` 给已有的 `?date=` 参数，**不动 `TIME_ZONE`**（会牵连记账/博客所有时间显示）
 - **`deploy.sh` 接管 nginx 配置**（commit `9bc9aad`，新增 6.2 步）：`deploy/nginx.conf` 长期是孤儿模板，生产 conf 全靠手工维护（十几个 `.bak` 为证）。现在仅在 `cmp` 检出差异时备份 + 覆盖 + `nginx -t`，校验不过立刻回滚并 `exit 1`。首次同步只改掉一行过时注释，说明此前无实质漂移
-- ⚠️ **坑**：`bash deploy/deploy.sh` 会在第 1 步 git pull 换掉脚本自己，但这一轮 bash 读的仍是已打开的旧文件——**给 deploy.sh 加的新步骤要下一次部署才生效**。改部署脚本记得连跑两轮
+- ⚠️ **本项目早就有 GitHub Actions 自动部署**（`.github/workflows/deploy.yml`，2026-03 起），push 到 main 即测试 + 部署。本轮全程手动 `ssh` 跑 `deploy.sh` 是**多余且有并发风险**的——CLAUDE.md 旧版只写了手动流程、没提 CI，照着做就踩进去了。部署章节已重写
+- ⚠️ **坑**：`bash deploy/deploy.sh` 会在第 1 步 git pull 换掉脚本自己，但这一轮 bash 读的仍是已打开的旧文件——**给 deploy.sh 加的新步骤要下一次部署才生效**
+- 排查记录更正：当时以为「nginx 同步在我手动跑的上一轮就完成了」，实际那次同步（备份 `bak.20260906T181414Z`）更可能是 CI 那轮做的。现象解释没错，执行者认错了
 - 本地环境：`venv/` 原本不存在（CLAUDE.md 里的 `source ../venv/bin/activate` 是空指令），用 `uv` 建了 Python 3.12 环境；本地库补跑 `readings.0003/0004` + `import_cards`（原本 0 张牌）
 - 线上验证：6 页匿名直达无重定向；`/tarot/codex` 85 张图 0 broken；`/daily` 显示本地日期且随 `?date=` 换牌
 - **凯尔特十字有张牌翻不出来**（commit `d943c32`）：「挑战」与「现状」同坐标、`z-index 20` 横压。真凶不是那张牌，而是 `.layout-piece` ——纯定位用的透明容器把 label 和卡牌一起撑成远大于卡牌的盒子，吞掉下层点击。命中测试实测「现状」只有 **9.5%** 面积可达（672 个采样点里 608 个被挡）
