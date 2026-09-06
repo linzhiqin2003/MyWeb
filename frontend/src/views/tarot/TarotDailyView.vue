@@ -96,6 +96,14 @@ const oracleLine = computed(() => {
   return '今天只给一张。点它，让它翻过来。';
 });
 
+// 「今日」按访客本地时区切日：后端 date.today() 走进程 TZ（settings.TIME_ZONE = UTC），
+// 不传 date 的话 UTC+8 用户在当地 08:00 前会拿到昨天那张牌。
+function localToday() {
+  const d = new Date();
+  const pad = (n) => String(n).padStart(2, '0');
+  return `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}`;
+}
+
 const dateLabel = computed(() => {
   const iso = daily.value?.date;
   const d = iso ? new Date(`${iso}T00:00:00`) : new Date();
@@ -114,7 +122,7 @@ const drawnStub = computed(() => {
 
 onMounted(async () => {
   try {
-    const res = await api.getDaily();
+    const res = await api.getDaily(localToday());
     daily.value = res.data;
   } catch (e) {
     console.error(e);
