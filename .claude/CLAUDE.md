@@ -135,6 +135,9 @@ cd receipts-frontend && npm run dev # http://localhost:5174
 - ⚠️ **坑**：`bash deploy/deploy.sh` 会在第 1 步 git pull 换掉脚本自己，但这一轮 bash 读的仍是已打开的旧文件——**给 deploy.sh 加的新步骤要下一次部署才生效**。改部署脚本记得连跑两轮
 - 本地环境：`venv/` 原本不存在（CLAUDE.md 里的 `source ../venv/bin/activate` 是空指令），用 `uv` 建了 Python 3.12 环境；本地库补跑 `readings.0003/0004` + `import_cards`（原本 0 张牌）
 - 线上验证：6 页匿名直达无重定向；`/tarot/codex` 85 张图 0 broken；`/daily` 显示本地日期且随 `?date=` 换牌
+- **凯尔特十字有张牌翻不出来**（commit `d943c32`）：「挑战」与「现状」同坐标、`z-index 20` 横压。真凶不是那张牌，而是 `.layout-piece` ——纯定位用的透明容器把 label 和卡牌一起撑成远大于卡牌的盒子，吞掉下层点击。命中测试实测「现状」只有 **9.5%** 面积可达（672 个采样点里 608 个被挡）
+- 处方：定位容器 `pointer-events: none`，只给 `.card-rotator` `auto`；再让**已翻开的牌退出命中测试**（`revealCard` 对已翻开的牌本就直接 return）→ 同一位置连点两下依次翻出两张，不用去够那条十几像素的窄边。桌面 / 手机 375×812 / 线上均验证
+- 顺带发现 `.overlay-card` 是**从未定义样式的死类名**（只在 SpreadLayout 里绑定），留着未动
 
 ### 2026-08-19
 - **塔罗圣所 PR #3 已审、合并并部署**：https://github.com/linzhiqin2003/MyWeb/pull/3 → merge `7660d54`
