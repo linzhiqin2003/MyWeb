@@ -10,7 +10,11 @@
       <span class="text-[10px] sm:text-xs tracking-[0.2em] uppercase text-gray-400 text-center max-w-[7rem] leading-tight">
         {{ positionLabel(spread, index) }}
       </span>
-      <div class="card-rotator" :style="{ transform: `rotate(${layoutAt(index).rotate || 0}deg)` }">
+      <div
+        class="card-rotator"
+        :class="{ 'is-revealed': item.revealed }"
+        :style="{ transform: `rotate(${layoutAt(index).rotate || 0}deg)` }"
+      >
         <TarotCard
           :card="item.card"
           :revealed="item.revealed"
@@ -78,6 +82,20 @@ function pieceStyle(index) {
 .layout-piece {
   transform: translate(-50%, -50%) rotate(var(--rot, 0deg));
   animation: riseIn 0.7s ease-out both;
+  /* 这个盒子只负责定位，它把标签和卡牌一起撑成一个远大于卡牌的透明矩形。
+     凯尔特十字里「挑战」横压在「现状」上（同坐标 + z-index 20），若容器
+     本身接管点击，它的空白处会吃掉盖住的那张牌几乎所有可点面积。
+     只让卡牌自己可点，露出来的部分就能正常翻开。 */
+  pointer-events: none;
+}
+.layout-piece .card-rotator {
+  pointer-events: auto;
+}
+/* 翻开的牌不再需要点击（revealCard 对已翻开的牌本就直接 return）。
+   让它退出命中测试，「挑战」翻开后压在下面的「现状」就能整张点到，
+   同一个位置连点两下即可依次翻开两张，而不是去够那条十几像素的窄边。 */
+.layout-piece .card-rotator.is-revealed {
+  pointer-events: none;
 }
 @keyframes riseIn {
   from { opacity: 0; transform: translate(-50%, -32%) scale(0.86) rotate(var(--rot, 0deg)); }
