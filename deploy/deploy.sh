@@ -24,13 +24,15 @@ echo -e "${YELLOW}📦 1. 拉取最新代码...${NC}"
 # （说明 stash 的内容已经被 origin 里的 commit 覆盖），就丢弃 stash，原 working
 # tree 已经被 origin 的版本替代，正是想要的结果。
 AUTOSTASHED=0
-if ! git diff --quiet || ! git diff --cached --quiet || [ -n "$(git ls-files --others --exclude-standard)" ]; then
-    echo -e "${YELLOW}⚠️  working tree 有未提交改动，先 stash 让 pull 能跑${NC}"
-    git stash push -u -m "deploy.sh autostash $(date -u +%FT%TZ)" || true
-    AUTOSTASHED=1
-fi
-git pull --rebase=false origin main
-if [ "$AUTOSTASHED" = "1" ]; then
+
+# stash 的恢复挂在 trap EXIT 上，而不是只写在 pull 之后的顺序流程里：
+# `set -e` 下 git pull 一旦失败（这台机器到 github.com 的 443 偶尔超时）
+# 脚本会当场退出，顺序流程里的 pop 根本轮不到执行，stash 就永远留在栈里。
+# 服务器上因此积压过一个 2026-02-04 的孤儿 stash，直到 2026-09-07 才被发现。
+restore_autostash() {
+    [ "$AUTOSTASHED" = "1" ] || return 0
+    AUTOSTASHED=0
+    cd ~/KitchenBook || return 0   # trap 触发时 cwd 可能已经在 frontend/ 里
     if git stash pop 2>/dev/null; then
         echo -e "${YELLOW}↻ stash 已恢复（pull 不冲突）${NC}"
     else
@@ -39,7 +41,17 @@ if [ "$AUTOSTASHED" = "1" ]; then
         git checkout -- . 2>/dev/null || true
         git stash drop 2>/dev/null || true
     fi
+}
+
+if ! git diff --quiet || ! git diff --cached --quiet || [ -n "$(git ls-files --others --exclude-standard)" ]; then
+    echo -e "${YELLOW}⚠️  working tree 有未提交改动，先 stash 让 pull 能跑${NC}"
+    git stash push -u -m "deploy.sh autostash $(date -u +%FT%TZ)" || true
+    AUTOSTASHED=1
+    trap restore_autostash EXIT
 fi
+git pull --rebase=false origin main
+restore_autostash
+trap - EXIT
 
 echo -e "${YELLOW}🐍 2. 激活虚拟环境...${NC}"
 source venv/bin/activate
