@@ -65,3 +65,8 @@ software-tools-summaries-zh/
 
 # 像素形象设计原型（临时预览资产）
 .sprite-preview/
+
+# Claude Code 临时 worktree —— 每个都是独立 git 仓库，曾被误当成
+# submodule 提交（.gitmodules 里没有对应 url），导致 CI checkout 的
+# post-job cleanup 阶段 `git submodule foreach` 报 exit code 128
+.claude/worktrees/
