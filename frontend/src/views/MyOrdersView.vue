@@ -1,7 +1,6 @@
 <script setup>
 import { ref, onMounted } from 'vue'
-import axios from 'axios'
-import API_BASE_URL from '../config/api'
+import api from '../api/client'
 import { cart } from '../store/cart'
 
 const myOrders = ref([])
@@ -22,7 +21,7 @@ const fetchMyOrders = async () => {
         const validOrderIds = []
         const orderPromises = cart.myOrderIds.map(async id => {
             try {
-                const response = await axios.get(`${API_BASE_URL}/api/orders/${id}/`)
+                const response = await api.get(`/orders/${id}/`)
                 validOrderIds.push(id)
                 return response.data
             } catch (e) {

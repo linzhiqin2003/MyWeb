@@ -1,6 +1,5 @@
 import { reactive, watch } from 'vue'
-import axios from 'axios'
-import API_BASE_URL from '../config/api'
+import api from '../api/client'
 
 // Load initial state from localStorage
 const savedOrderIds = JSON.parse(localStorage.getItem('kitchen_book_orders') || '[]')
@@ -57,7 +56,7 @@ export const cart = reactive({
                 }))
             }
             
-            const response = await axios.post(`${API_BASE_URL}/api/orders/`, payload)
+            const response = await api.post('/orders/', payload)
             
             // Track this new order
             this.myOrderIds.push(response.data.id)
@@ -103,7 +102,7 @@ export const cart = reactive({
                 }))
             }
             
-            const response = await axios.post(`${API_BASE_URL}/api/orders/`, payload)
+            const response = await api.post('/orders/', payload)
             
             this.myOrderIds.push(response.data.id)
             localStorage.setItem('kitchen_book_orders', JSON.stringify(this.myOrderIds))

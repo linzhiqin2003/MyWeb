@@ -81,9 +81,14 @@ class Order(models.Model):
     ]
     
     customer_name = models.CharField(max_length=100)
+    # 下单的登录用户；早期匿名订单为空，只有主厨能看到
+    user = models.ForeignKey(
+        settings.AUTH_USER_MODEL, null=True, blank=True,
+        on_delete=models.SET_NULL, related_name='kitchen_orders',
+    )
     created_at = models.DateTimeField(auto_now_add=True)
     status = models.CharField(max_length=20, choices=STATUS_CHOICES, default='pending')
-    
+
     def __str__(self):
         return f"Order by {self.customer_name} at {self.created_at}"
 

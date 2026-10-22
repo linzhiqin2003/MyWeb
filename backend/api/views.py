@@ -11,8 +11,6 @@ from django.http import HttpResponse, StreamingHttpResponse
 from django.views.decorators.csrf import csrf_exempt
 from django.core.files.storage import default_storage
 from datetime import datetime, timezone as dt_timezone
-import hashlib
-import time
 import json
 import re
 import os
@@ -23,6 +21,7 @@ import tempfile
 import requests
 from pathlib import Path
 from .models import Recipe, Ingredient, Order, BlogPost, Tag, Category, RecipeStep, RecipeIngredient
+from .permissions import IsChef, is_valid_chef_token, issue_chef_token, request_has_chef_token
 from .serializers import (
     RecipeSerializer, PublicRecipeSerializer, IngredientSerializer, OrderSerializer,
     BlogPostListSerializer, BlogPostDetailSerializer, TagSerializer, CategorySerializer,
@@ -40,13 +39,9 @@ class ChefAuthView(APIView):
         password = request.data.get('password', '')
         
         if username == settings.CHEF_USERNAME and password == settings.CHEF_PASSWORD:
-            # 生成一个简单的 token（基于密钥和时间戳）
-            token_data = f"{settings.SECRET_KEY}:{username}:{int(time.time())}"
-            token = hashlib.sha256(token_data.encode()).hexdigest()[:32]
-            
             return Response({
                 'success': True,
-                'token': token,
+                'token': issue_chef_token(),
                 'message': '登录成功，欢迎回来主厨！'
             })
         else:
@@ -56,9 +51,9 @@ class ChefAuthView(APIView):
             }, status=status.HTTP_401_UNAUTHORIZED)
     
     def get(self, request):
-        """验证 token 是否有效（简单验证：只要有 token 就认为有效）"""
-        token = request.headers.get('Authorization', '').replace('Bearer ', '')
-        if token and len(token) == 32:
+        """验证主厨 token：签名正确且未过期（X-Chef-Token 或 Authorization: Bearer）"""
+        token = request.headers.get('X-Chef-Token') or request.headers.get('Authorization', '').replace('Bearer ', '')
+        if is_valid_chef_token(token):
             return Response({'valid': True})
         return Response({'valid': False}, status=status.HTTP_401_UNAUTHORIZED)
 
@@ -242,10 +237,23 @@ class RecipeIngredientViewSet(viewsets.ModelViewSet):
 
 
 class OrderViewSet(viewsets.ModelViewSet):
-    queryset = Order.objects.all().order_by('-created_at')
+    """订单含顾客姓名：必须登录；普通用户只能看到自己的订单，改状态和删除只给主厨。"""
     serializer_class = OrderSerializer
-    authentication_classes = []
-    permission_classes = []
+    authentication_classes = [_JWTAuth]
+
+    def get_permissions(self):
+        if self.action in ('update', 'partial_update', 'destroy'):
+            return [permissions.IsAuthenticated(), IsChef()]
+        return [permissions.IsAuthenticated()]
+
+    def get_queryset(self):
+        queryset = Order.objects.all().order_by('-created_at')
+        if request_has_chef_token(self.request):
+            return queryset
+        return queryset.filter(user=self.request.user)
+
+    def perform_create(self, serializer):
+        serializer.save(user=self.request.user)
 
 
 # ==================== 技术博客视图 ====================

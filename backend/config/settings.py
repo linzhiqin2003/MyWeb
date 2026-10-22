@@ -108,6 +108,10 @@ else:
         'https://yourdomain.com'
     ).split(',')
 
+# 主厨二级认证走单独的请求头（Authorization 留给站点 JWT）
+from corsheaders.defaults import default_headers  # noqa: E402
+CORS_ALLOW_HEADERS = (*default_headers, 'x-chef-token')
+
 
 ROOT_URLCONF = "config.urls"
 

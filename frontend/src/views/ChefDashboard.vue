@@ -1,14 +1,35 @@
 <script setup>
 import { ref, onMounted, computed } from 'vue'
 import axios from 'axios'
+import { useRouter } from 'vue-router'
+import api from '../api/client'
 import API_BASE_URL from '../config/api'
+import { useAuthStore } from '../store/auth'
+
+const authStore = useAuthStore()
+// 主厨令牌放在单独的请求头里，Authorization 留给站点 JWT
+const chefHeaders = () => ({ 'X-Chef-Token': authStore.state.chefToken })
+const router = useRouter()
+
+// 旧版主厨令牌已失效：先向后端验证，失效就退出主厨登录并回到登录页
+// 用不带拦截器的 axios，避免 401 触发站点 JWT 的刷新与跳转
+const ensureChef = async () => {
+  try {
+    await axios.get(`${API_BASE_URL}/api/chef/login/`, { headers: chefHeaders() })
+    return true
+  } catch (e) {
+    authStore.chefLogout()
+    router.replace({ path: '/kitchen/chef/login', query: { redirect: '/kitchen/chef/orders' } })
+    return false
+  }
+}
 
 const orders = ref([])
 const loading = ref(true)
 
 const fetchOrders = async () => {
   try {
-    const response = await axios.get(`${API_BASE_URL}/api/orders/`)
+    const response = await api.get('/orders/', { headers: chefHeaders() })
     orders.value = response.data
   } catch (error) {
     console.error('Fetch orders failed', error)
@@ -17,11 +38,13 @@ const fetchOrders = async () => {
   }
 }
 
-onMounted(fetchOrders)
+onMounted(async () => {
+  if (await ensureChef()) fetchOrders()
+})
 
 const updateStatus = async (order, status) => {
     try {
-        await axios.patch(`${API_BASE_URL}/api/orders/${order.id}/`, { status })
+        await api.patch(`/orders/${order.id}/`, { status }, { headers: chefHeaders() })
         order.status = status
         // Refetch to update stock usage implications if we implemented that
         // For now, just UI update

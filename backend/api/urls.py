@@ -10,7 +10,7 @@ from .views import (
 router = DefaultRouter()
 router.register(r'recipes', RecipeViewSet)
 router.register(r'ingredients', IngredientViewSet)
-router.register(r'orders', OrderViewSet)
+router.register(r'orders', OrderViewSet, basename='order')
 router.register(r'recipe-steps', RecipeStepViewSet, basename='recipe-step')
 router.register(r'recipe-ingredients', RecipeIngredientViewSet, basename='recipe-ingredient')
 router.register(r'blog/posts', BlogPostViewSet, basename='blogpost')
