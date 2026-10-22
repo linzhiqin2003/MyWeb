@@ -1,11 +1,12 @@
 <script setup>
 import { ref, onMounted, computed, nextTick } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
-import axios from 'axios'
 import { marked } from 'marked'
 import hljs from 'highlight.js'
 import API_BASE_URL from '../config/api'
-import { auth } from '../store/auth'
+import { chefApi, useChefGuard } from '../composables/useChefAuth'
+
+const { ensureChef } = useChefGuard()
 
 const route = useRoute()
 const router = useRouter()
@@ -51,7 +52,7 @@ const toggleTheme = () => {
 // 获取所有标签
 const fetchTags = async () => {
   try {
-    const response = await axios.get(`${API_BASE_URL}/api/blog/tags/`)
+    const response = await chefApi.get(`${API_BASE_URL}/api/blog/tags/`)
     allTags.value = response.data
   } catch (error) {
     console.error('Failed to fetch tags', error)
@@ -64,9 +65,7 @@ const fetchPost = async () => {
   
   try {
     loading.value = true
-    const response = await axios.get(`${API_BASE_URL}/api/blog/posts/${route.params.id}/?mode=chef`, {
-      headers: { Authorization: `Bearer ${auth.token}` }
-    })
+    const response = await chefApi.get(`${API_BASE_URL}/api/blog/posts/${route.params.id}/?mode=chef`)
     const post = response.data
     form.value = {
       title: post.title,
@@ -88,7 +87,8 @@ const fetchPost = async () => {
   }
 }
 
-onMounted(() => {
+onMounted(async () => {
+  if (!(await ensureChef())) return
   fetchTags()
   fetchPost()
 })
@@ -123,7 +123,7 @@ const createTag = async () => {
   if (!newTagName.value.trim()) return
   
   try {
-    const response = await axios.post(`${API_BASE_URL}/api/blog/tags/`, {
+    const response = await chefApi.post(`${API_BASE_URL}/api/blog/tags/`, {
       name: newTagName.value.trim(),
       color: newTagColor.value
     })
@@ -219,7 +219,7 @@ const handleImageUpload = async (event) => {
     const formData = new FormData()
     formData.append('image', file)
     
-    const response = await axios.post(`${API_BASE_URL}/api/blog/posts/upload-image/`, formData, {
+    const response = await chefApi.post(`${API_BASE_URL}/api/blog/posts/upload-image/`, formData, {
       headers: { 'Content-Type': 'multipart/form-data' }
     })
     
@@ -266,15 +266,14 @@ const savePost = async (publish = false) => {
     
     const config = {
       headers: {
-        Authorization: `Bearer ${auth.token}`,
         'Content-Type': 'multipart/form-data'
       }
     }
     
     if (isEditMode.value) {
-      await axios.patch(`${API_BASE_URL}/api/blog/posts/${route.params.id}/`, formData, config)
+      await chefApi.patch(`${API_BASE_URL}/api/blog/posts/${route.params.id}/`, formData, config)
     } else {
-      await axios.post(`${API_BASE_URL}/api/blog/posts/`, formData, config)
+      await chefApi.post(`${API_BASE_URL}/api/blog/posts/`, formData, config)
     }
     
     router.push(studioBasePath)

@@ -118,3 +118,121 @@ class ChefAuthTests(TestCase):
     def test_token_is_signed_for_chef_username(self):
         value = signing.TimestampSigner(salt="kitchen.chef").unsign(chef_token())
         self.assertEqual(value, "chef")
+
+
+class ChefOnlyWriteTests(TestCase):
+    """菜谱、库存、博客：访客只能读公开内容；写操作和 mode=chef 的读都要主厨令牌。"""
+
+    def setUp(self):
+        from .models import BlogPost, Ingredient, RecipeStep, Tag, Category
+        self.recipe = Recipe.objects.create(title="公开菜", cooking_time=10, chef_notes="秘方")
+        self.hidden = Recipe.objects.create(title="私房菜", cooking_time=10, is_public=False)
+        self.ingredient = Ingredient.objects.create(name="鸡蛋")
+        self.step = RecipeStep.objects.create(recipe=self.recipe, step_number=1, description="打蛋")
+        self.tag = Tag.objects.create(name="python")
+        self.category = Category.objects.create(name="笔记", slug="notes")
+        self.post = BlogPost.objects.create(title="已发布", slug="pub", content="x", is_published=True)
+        self.draft = BlogPost.objects.create(title="草稿", slug="draft", content="x", is_published=False)
+        self.anon = APIClient()
+        self.user = APIClient()
+        self.user.force_authenticate(User.objects.create_user(username="u@example.com", password="pw-u-1"))
+        self.chef = APIClient()
+        self.chef.credentials(HTTP_X_CHEF_TOKEN=chef_token())
+
+    def test_public_reads_still_work_for_guests(self):
+        self.assertEqual(self.anon.get("/api/recipes/").status_code, status.HTTP_200_OK)
+        self.assertEqual(self.anon.get(f"/api/recipes/{self.recipe.id}/").status_code, status.HTTP_200_OK)
+        for url in ("/api/blog/posts/", "/api/blog/tags/", "/api/blog/categories/",
+                    "/api/blog/posts/stats/", "/api/blog/posts/graph/", "/api/blog/posts/by-slug/pub/",
+                    f"/api/blog/posts/{self.post.id}/"):
+            self.assertEqual(self.anon.get(url).status_code, status.HTTP_200_OK, url)
+
+    def test_guest_reads_hide_private_content(self):
+        ids = [r["id"] for r in self.anon.get("/api/recipes/").data]
+        self.assertNotIn(self.hidden.id, ids)
+        self.assertNotIn("chef_notes", self.anon.get(f"/api/recipes/{self.recipe.id}/").data)
+        slugs = [p["slug"] for p in self.anon.get("/api/blog/posts/").data]
+        self.assertNotIn("draft", slugs)
+        self.assertEqual(self.anon.get("/api/blog/posts/by-slug/draft/").status_code, status.HTTP_404_NOT_FOUND)
+
+    def test_chef_mode_reads_need_chef_token(self):
+        for client in (self.anon, self.user):
+            for url in ("/api/recipes/?mode=chef", f"/api/recipes/{self.recipe.id}/?mode=chef",
+                        "/api/blog/posts/?mode=chef", f"/api/blog/posts/{self.draft.id}/?mode=chef",
+                        "/api/blog/posts/by-slug/draft/?mode=chef"):
+                self.assertIn(client.get(url).status_code,
+                              (status.HTTP_401_UNAUTHORIZED, status.HTTP_403_FORBIDDEN), url)
+        self.assertEqual(self.chef.get("/api/recipes/?mode=chef").status_code, status.HTTP_200_OK)
+        self.assertEqual(self.chef.get(f"/api/blog/posts/{self.draft.id}/?mode=chef").data["title"], "草稿")
+        self.assertIn(self.hidden.id, [r["id"] for r in self.chef.get("/api/recipes/?mode=chef").data])
+
+    def test_kitchen_back_office_endpoints_are_chef_only(self):
+        for url in ("/api/ingredients/", "/api/recipe-steps/", "/api/recipe-ingredients/",
+                    f"/api/recipe-steps/?recipe={self.recipe.id}"):
+            for client in (self.anon, self.user):
+                self.assertIn(client.get(url).status_code,
+                              (status.HTTP_401_UNAUTHORIZED, status.HTTP_403_FORBIDDEN), url)
+            self.assertEqual(self.chef.get(url).status_code, status.HTTP_200_OK, url)
+
+    def test_writes_are_rejected_without_chef_token(self):
+        from .models import BlogPost, Ingredient
+        writes = [
+            ("post", "/api/recipes/", {"title": "x", "cooking_time": 1}),
+            ("patch", f"/api/recipes/{self.recipe.id}/", {"title": "改"}),
+            ("delete", f"/api/recipes/{self.recipe.id}/", None),
+            ("post", "/api/ingredients/", {"name": "盐"}),
+            ("patch", f"/api/ingredients/{self.ingredient.id}/", {"name": "改"}),
+            ("delete", f"/api/ingredients/{self.ingredient.id}/", None),
+            ("post", "/api/recipe-steps/batch-update/", {"recipe_id": self.recipe.id, "steps": []}),
+            ("delete", f"/api/recipe-steps/{self.step.id}/", None),
+            ("post", "/api/recipe-ingredients/batch-update/", {"recipe_id": self.recipe.id, "ingredients": []}),
+            ("post", "/api/blog/posts/", {"title": "x", "content": "x"}),
+            ("patch", f"/api/blog/posts/{self.post.id}/", {"title": "改"}),
+            ("delete", f"/api/blog/posts/{self.post.id}/", None),
+            ("post", "/api/blog/posts/upload-image/", {}),
+            ("post", "/api/blog/tags/", {"name": "新标签"}),
+            ("delete", f"/api/blog/tags/{self.tag.id}/", None),
+            ("post", "/api/blog/categories/", {"name": "新分类", "slug": "new"}),
+            ("delete", f"/api/blog/categories/{self.category.id}/", None),
+        ]
+        bad_chef = APIClient()
+        bad_chef.credentials(HTTP_X_CHEF_TOKEN="0" * 32)
+        for client in (self.anon, self.user, bad_chef):
+            for method, url, data in writes:
+                resp = getattr(client, method)(url, data, format="json")
+                self.assertIn(resp.status_code, (status.HTTP_401_UNAUTHORIZED, status.HTTP_403_FORBIDDEN),
+                              f"{method} {url}")
+        self.assertEqual(Recipe.objects.get(id=self.recipe.id).title, "公开菜")
+        self.assertTrue(Ingredient.objects.filter(id=self.ingredient.id).exists())
+        self.assertEqual(BlogPost.objects.get(id=self.post.id).title, "已发布")
+        self.assertEqual(Recipe.objects.count(), 2)
+
+    def test_chef_can_write(self):
+        from .models import BlogPost
+        self.assertEqual(self.chef.patch(f"/api/recipes/{self.recipe.id}/", {"title": "改"}, format="json").status_code,
+                         status.HTTP_200_OK)
+        self.assertEqual(self.chef.post("/api/ingredients/", {"name": "盐"}, format="json").status_code,
+                         status.HTTP_201_CREATED)
+        self.assertEqual(self.chef.patch(f"/api/blog/posts/{self.post.id}/", {"title": "改"}, format="json").status_code,
+                         status.HTTP_200_OK)
+        self.assertEqual(BlogPost.objects.get(id=self.post.id).title, "改")
+        self.assertEqual(self.chef.post("/api/blog/tags/", {"name": "新标签"}, format="json").status_code,
+                         status.HTTP_201_CREATED)
+
+
+class AiEndpointAuthTests(TestCase):
+    """AI 接口会消耗模型额度：必须登录。"""
+
+    URLS = ("/api/ai/chat/", "/api/ai/ocr/", "/api/ai/pdf-extract/", "/api/ai/transcribe/")
+
+    def test_anonymous_is_rejected(self):
+        for url in self.URLS:
+            self.assertEqual(APIClient().post(url, {}, format="json").status_code,
+                             status.HTTP_401_UNAUTHORIZED, url)
+
+    def test_logged_in_user_reaches_validation(self):
+        client = APIClient()
+        client.force_authenticate(User.objects.create_user(username="ai@example.com", password="pw-ai-1"))
+        for url in self.URLS:
+            self.assertEqual(client.post(url, {}, format="json").status_code,
+                             status.HTTP_400_BAD_REQUEST, url)

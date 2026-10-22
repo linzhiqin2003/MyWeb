@@ -39,3 +39,13 @@ class IsChef(permissions.BasePermission):
 
     def has_permission(self, request, view):
         return request_has_chef_token(request)
+
+
+class PublicReadChefWrite(permissions.BasePermission):
+    """访客可读公开内容；写操作和 ?mode=chef 的读（草稿、主厨备注）要主厨令牌。"""
+
+    def has_permission(self, request, view):
+        chef_read = request.query_params.get('mode') == 'chef'
+        if request.method in permissions.SAFE_METHODS and not chef_read:
+            return True
+        return request_has_chef_token(request)

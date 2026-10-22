@@ -2,6 +2,22 @@
 import { ref, nextTick, onMounted } from 'vue'
 import API_BASE_URL from '../config/api'
 import { cart } from '../store/cart'
+import api from '../api/client'
+
+// AI 接口要求登录。流式响应用 fetch，不经过 axios 拦截器：
+// 带上站点 JWT；遇到 401 先借 api 客户端刷新令牌，再重试一次
+const authedFetch = async (url, init = {}) => {
+  const withAuth = () => ({
+    ...init,
+    headers: { ...(init.headers || {}), Authorization: `Bearer ${localStorage.getItem('access_token') || ''}` },
+  })
+  let response = await fetch(url, withAuth())
+  if (response.status === 401) {
+    await api.get('/auth/me/').catch(() => {})
+    response = await fetch(url, withAuth())
+  }
+  return response
+}
 
 // 聊天状态
 const isOpen = ref(false)
@@ -254,7 +270,7 @@ const sendMessage = async () => {
   const getAiMessage = () => messages.value.find(m => m._id === messageId)
   
   try {
-    const response = await fetch(`${API_BASE_URL}/api/ai/chat/`, {
+    const response = await authedFetch(`${API_BASE_URL}/api/ai/chat/`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ 
@@ -470,7 +486,7 @@ const transcribeAudio = async (audioBlob, duration = 0) => {
     formData.append('audio', audioBlob, 'recording.webm')
     formData.append('duration', duration.toString())
     
-    const response = await fetch(`${API_BASE_URL}/api/ai/transcribe/`, {
+    const response = await authedFetch(`${API_BASE_URL}/api/ai/transcribe/`, {
       method: 'POST',
       body: formData
     })

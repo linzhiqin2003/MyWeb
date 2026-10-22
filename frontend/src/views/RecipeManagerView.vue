@@ -1,7 +1,9 @@
 <script setup>
 import { ref, onMounted } from 'vue'
-import axios from 'axios'
 import API_BASE_URL from '../config/api'
+import { chefApi, useChefGuard } from '../composables/useChefAuth'
+
+const { ensureChef } = useChefGuard()
 
 const recipes = ref([])
 const loading = ref(true)
@@ -9,7 +11,7 @@ const loading = ref(true)
 const fetchRecipes = async () => {
   try {
     // Use 'chef' mode to get full details if needed, though list is usually simple
-        const response = await axios.get(`${API_BASE_URL}/api/recipes/?mode=chef`)
+        const response = await chefApi.get(`${API_BASE_URL}/api/recipes/?mode=chef`)
     recipes.value = response.data
   } catch (error) {
     console.error('Failed to fetch recipes', error)
@@ -21,14 +23,16 @@ const fetchRecipes = async () => {
 const deleteRecipe = async (id) => {
     if(!confirm('确定要删除这道菜吗？')) return
     try {
-        await axios.delete(`${API_BASE_URL}/api/recipes/${id}/`)
+        await chefApi.delete(`${API_BASE_URL}/api/recipes/${id}/`)
         recipes.value = recipes.value.filter(r => r.id !== id)
     } catch (error) {
         alert('删除失败')
     }
 }
 
-onMounted(fetchRecipes)
+onMounted(async () => {
+    if (await ensureChef()) fetchRecipes()
+})
 </script>
 
 <template>

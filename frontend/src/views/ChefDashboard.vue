@@ -1,28 +1,10 @@
 <script setup>
 import { ref, onMounted, computed } from 'vue'
-import axios from 'axios'
-import { useRouter } from 'vue-router'
 import api from '../api/client'
-import API_BASE_URL from '../config/api'
-import { useAuthStore } from '../store/auth'
+import { chefHeaders, useChefGuard } from '../composables/useChefAuth'
 
-const authStore = useAuthStore()
-// 主厨令牌放在单独的请求头里，Authorization 留给站点 JWT
-const chefHeaders = () => ({ 'X-Chef-Token': authStore.state.chefToken })
-const router = useRouter()
-
-// 旧版主厨令牌已失效：先向后端验证，失效就退出主厨登录并回到登录页
-// 用不带拦截器的 axios，避免 401 触发站点 JWT 的刷新与跳转
-const ensureChef = async () => {
-  try {
-    await axios.get(`${API_BASE_URL}/api/chef/login/`, { headers: chefHeaders() })
-    return true
-  } catch (e) {
-    authStore.chefLogout()
-    router.replace({ path: '/kitchen/chef/login', query: { redirect: '/kitchen/chef/orders' } })
-    return false
-  }
-}
+// 订单接口要站点 JWT（api 客户端），主厨身份另放在 X-Chef-Token
+const { ensureChef } = useChefGuard()
 
 const orders = ref([])
 const loading = ref(true)

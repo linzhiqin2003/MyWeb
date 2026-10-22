@@ -1,7 +1,9 @@
 <script setup>
 import { ref, computed, onMounted } from 'vue'
-import axios from 'axios'
 import API_BASE_URL from '../config/api'
+import { chefApi, useChefGuard } from '../composables/useChefAuth'
+
+const { ensureChef } = useChefGuard()
 
 const ingredients = ref([])
 const loading = ref(true)
@@ -48,7 +50,7 @@ const stats = computed(() => {
 
 const fetchIngredients = async () => {
     try {
-        const response = await axios.get(`${API_BASE_URL}/api/ingredients/`)
+        const response = await chefApi.get(`${API_BASE_URL}/api/ingredients/`)
         ingredients.value = response.data
     } catch (e) {
         console.error(e)
@@ -67,7 +69,7 @@ const toggleStock = async (ingredient) => {
     ingredient.in_stock = newQuantity > 0
     
     try {
-        await axios.patch(`${API_BASE_URL}/api/ingredients/${ingredient.id}/`, {
+        await chefApi.patch(`${API_BASE_URL}/api/ingredients/${ingredient.id}/`, {
             quantity: newQuantity
         })
     } catch (e) {
@@ -80,7 +82,7 @@ const toggleStock = async (ingredient) => {
 const addIngredient = async () => {
     if (!newIngredientName.value.trim()) return
     try {
-        const response = await axios.post(`${API_BASE_URL}/api/ingredients/`, {
+        const response = await chefApi.post(`${API_BASE_URL}/api/ingredients/`, {
             name: newIngredientName.value,
             category: newIngredientCategory.value,
             quantity: 100,
@@ -97,7 +99,7 @@ const addIngredient = async () => {
 const deleteIngredient = async (id) => {
     if (!confirm('确定删除该食材？')) return
     try {
-        await axios.delete(`${API_BASE_URL}/api/ingredients/${id}/`)
+        await chefApi.delete(`${API_BASE_URL}/api/ingredients/${id}/`)
         ingredients.value = ingredients.value.filter(i => i.id !== id)
     } catch (e) {
         alert('删除失败')
@@ -115,7 +117,7 @@ const cancelEdit = () => {
 const saveEdit = async () => {
     if (!editingIngredient.value) return
     try {
-        await axios.patch(`${API_BASE_URL}/api/ingredients/${editingIngredient.value.id}/`, {
+        await chefApi.patch(`${API_BASE_URL}/api/ingredients/${editingIngredient.value.id}/`, {
             name: editingIngredient.value.name,
             category: editingIngredient.value.category
         })
@@ -130,7 +132,9 @@ const saveEdit = async () => {
     }
 }
 
-onMounted(fetchIngredients)
+onMounted(async () => {
+    if (await ensureChef()) fetchIngredients()
+})
 </script>
 
 <template>

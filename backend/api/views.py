@@ -21,7 +21,9 @@ import tempfile
 import requests
 from pathlib import Path
 from .models import Recipe, Ingredient, Order, BlogPost, Tag, Category, RecipeStep, RecipeIngredient
-from .permissions import IsChef, is_valid_chef_token, issue_chef_token, request_has_chef_token
+from .permissions import (
+    IsChef, PublicReadChefWrite, is_valid_chef_token, issue_chef_token, request_has_chef_token,
+)
 from .serializers import (
     RecipeSerializer, PublicRecipeSerializer, IngredientSerializer, OrderSerializer,
     BlogPostListSerializer, BlogPostDetailSerializer, TagSerializer, CategorySerializer,
@@ -60,7 +62,7 @@ class ChefAuthView(APIView):
 class RecipeViewSet(viewsets.ModelViewSet):
     queryset = Recipe.objects.all()
     authentication_classes = [] # Disable SessionAuth to avoid CSRF in this demo
-    permission_classes = []
+    permission_classes = [PublicReadChefWrite]
     
     def get_serializer_class(self):
         if self.action == 'list':
@@ -85,17 +87,18 @@ class RecipeViewSet(viewsets.ModelViewSet):
         return Recipe.objects.all()
 
 class IngredientViewSet(viewsets.ModelViewSet):
+    """库存：只有主厨后台使用"""
     queryset = Ingredient.objects.all()
     serializer_class = IngredientSerializer
     authentication_classes = []
-    permission_classes = []
+    permission_classes = [IsChef]
 
 
 class RecipeStepViewSet(viewsets.ModelViewSet):
-    """菜谱步骤管理"""
+    """菜谱步骤管理（主厨专用；访客的菜谱详情不含步骤）"""
     serializer_class = RecipeStepSerializer
     authentication_classes = []
-    permission_classes = []
+    permission_classes = [IsChef]
     
     def get_queryset(self):
         recipe_id = self.request.query_params.get('recipe')
@@ -172,9 +175,9 @@ class RecipeStepViewSet(viewsets.ModelViewSet):
 
 
 class RecipeIngredientViewSet(viewsets.ModelViewSet):
-    """菜谱食材关联管理"""
+    """菜谱食材关联管理（主厨专用）"""
     authentication_classes = []
-    permission_classes = []
+    permission_classes = [IsChef]
     
     def get_queryset(self):
         recipe_id = self.request.query_params.get('recipe')
@@ -263,7 +266,7 @@ class TagViewSet(viewsets.ModelViewSet):
     queryset = Tag.objects.all()
     serializer_class = TagSerializer
     authentication_classes = []
-    permission_classes = []
+    permission_classes = [PublicReadChefWrite]
 
 
 class CategoryViewSet(viewsets.ModelViewSet):
@@ -271,13 +274,13 @@ class CategoryViewSet(viewsets.ModelViewSet):
     queryset = Category.objects.all()
     serializer_class = CategorySerializer
     authentication_classes = []
-    permission_classes = []
+    permission_classes = [PublicReadChefWrite]
 
 
 class BlogPostViewSet(viewsets.ModelViewSet):
     """博客文章管理"""
     authentication_classes = []
-    permission_classes = []
+    permission_classes = [PublicReadChefWrite]
     
     def get_queryset(self):
         queryset = BlogPost.objects.all()
@@ -463,8 +466,9 @@ class BlogPostViewSet(viewsets.ModelViewSet):
 
 class AiAgentView(APIView):
     """AI 智能体助手 - 支持工具调用，可以推荐菜品、操作购物车、下单"""
-    authentication_classes = []
-    permission_classes = []
+    # 会消耗模型额度：必须登录
+    authentication_classes = [_JWTAuth]
+    permission_classes = [permissions.IsAuthenticated]
     
     @staticmethod
     def clean_ai_response(text):
@@ -959,8 +963,9 @@ class AiAgentView(APIView):
 
 class DeepSeekOCRView(APIView):
     """DeepSeek-OCR 图片识别 - 通过硅基流动 API 将图片转换为 Markdown"""
-    authentication_classes = []
-    permission_classes = []
+    # 会消耗模型额度：必须登录
+    authentication_classes = [_JWTAuth]
+    permission_classes = [permissions.IsAuthenticated]
     
     def post(self, request):
         """处理图片 OCR 请求"""
@@ -1090,8 +1095,9 @@ class DeepSeekOCRView(APIView):
 
 class PDFExtractView(APIView):
     """提取 PDF 文件中的文本内容"""
-    authentication_classes = []
-    permission_classes = []
+    # 会消耗模型额度：必须登录
+    authentication_classes = [_JWTAuth]
+    permission_classes = [permissions.IsAuthenticated]
 
     def post(self, request):
         pdf_file = request.FILES.get('file')
@@ -1139,8 +1145,9 @@ class PDFExtractView(APIView):
 
 class WhisperTranscribeView(APIView):
     """语音转录 - 使用 Groq Whisper API 将语音转换为文字（通过 OpenAI SDK 调用）"""
-    authentication_classes = []
-    permission_classes = []
+    # 会消耗模型额度：必须登录
+    authentication_classes = [_JWTAuth]
+    permission_classes = [permissions.IsAuthenticated]
     
     def post(self, request):
         """处理语音转录请求"""

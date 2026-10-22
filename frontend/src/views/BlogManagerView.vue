@@ -1,9 +1,10 @@
 <script setup>
 import { ref, onMounted, computed } from 'vue'
 import { useRouter } from 'vue-router'
-import axios from 'axios'
 import API_BASE_URL from '../config/api'
-import { auth } from '../store/auth'
+import { chefApi, useChefGuard } from '../composables/useChefAuth'
+
+const { ensureChef } = useChefGuard()
 
 const router = useRouter()
 const posts = ref([])
@@ -27,9 +28,7 @@ const toggleTheme = () => {
 const fetchPosts = async () => {
   try {
     loading.value = true
-    const response = await axios.get(`${API_BASE_URL}/api/blog/posts/?mode=chef`, {
-      headers: { Authorization: `Bearer ${auth.token}` }
-    })
+    const response = await chefApi.get(`${API_BASE_URL}/api/blog/posts/?mode=chef`)
     posts.value = response.data
   } catch (error) {
     console.error('Failed to fetch posts', error)
@@ -41,7 +40,7 @@ const fetchPosts = async () => {
 // 获取标签
 const fetchTags = async () => {
   try {
-    const response = await axios.get(`${API_BASE_URL}/api/blog/tags/`)
+    const response = await chefApi.get(`${API_BASE_URL}/api/blog/tags/`)
     tags.value = response.data
   } catch (error) {
     console.error('Failed to fetch tags', error)
@@ -51,14 +50,15 @@ const fetchTags = async () => {
 // 获取统计
 const fetchStats = async () => {
   try {
-    const response = await axios.get(`${API_BASE_URL}/api/blog/posts/stats/`)
+    const response = await chefApi.get(`${API_BASE_URL}/api/blog/posts/stats/`)
     stats.value = response.data
   } catch (error) {
     console.error('Failed to fetch stats', error)
   }
 }
 
-onMounted(() => {
+onMounted(async () => {
+  if (!(await ensureChef())) return
   fetchPosts()
   fetchTags()
   fetchStats()
@@ -113,9 +113,7 @@ const deletePost = async (post) => {
   if (!confirm(`确定要删除文章「${post.title}」吗？此操作不可恢复。`)) return
   
   try {
-    await axios.delete(`${API_BASE_URL}/api/blog/posts/${post.id}/`, {
-      headers: { Authorization: `Bearer ${auth.token}` }
-    })
+    await chefApi.delete(`${API_BASE_URL}/api/blog/posts/${post.id}/`)
     posts.value = posts.value.filter(p => p.id !== post.id)
   } catch (error) {
     console.error('Failed to delete post', error)
@@ -126,10 +124,8 @@ const deletePost = async (post) => {
 // 切换发布状态
 const togglePublish = async (post) => {
   try {
-    await axios.patch(`${API_BASE_URL}/api/blog/posts/${post.id}/`, {
+    await chefApi.patch(`${API_BASE_URL}/api/blog/posts/${post.id}/`, {
       is_published: !post.is_published
-    }, {
-      headers: { Authorization: `Bearer ${auth.token}` }
     })
     post.is_published = !post.is_published
   } catch (error) {
@@ -141,10 +137,8 @@ const togglePublish = async (post) => {
 // 切换精选状态
 const toggleFeatured = async (post) => {
   try {
-    await axios.patch(`${API_BASE_URL}/api/blog/posts/${post.id}/`, {
+    await chefApi.patch(`${API_BASE_URL}/api/blog/posts/${post.id}/`, {
       is_featured: !post.is_featured
-    }, {
-      headers: { Authorization: `Bearer ${auth.token}` }
     })
     post.is_featured = !post.is_featured
   } catch (error) {
@@ -158,9 +152,7 @@ const deleteTag = async (tag) => {
   if (!confirm(`确定要删除标签「${tag.name}」吗？`)) return
   
   try {
-    await axios.delete(`${API_BASE_URL}/api/blog/tags/${tag.id}/`, {
-      headers: { Authorization: `Bearer ${auth.token}` }
-    })
+    await chefApi.delete(`${API_BASE_URL}/api/blog/tags/${tag.id}/`)
     tags.value = tags.value.filter(t => t.id !== tag.id)
   } catch (error) {
     console.error('Failed to delete tag', error)

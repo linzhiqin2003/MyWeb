@@ -1,8 +1,10 @@
 <script setup>
 import { ref, onMounted, computed } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
-import axios from 'axios'
 import API_BASE_URL from '../config/api'
+import { chefApi, useChefGuard } from '../composables/useChefAuth'
+
+const { ensureChef } = useChefGuard()
 
 const route = useRoute()
 const router = useRouter()
@@ -36,9 +38,10 @@ const activeTab = ref('basic') // 'basic' | 'steps' | 'ingredients'
 
 // 加载数据
 onMounted(async () => {
+    if (!(await ensureChef())) return
     // 加载食材库
     try {
-        const { data } = await axios.get(`${API_BASE_URL}/api/ingredients/`)
+        const { data } = await chefApi.get(`${API_BASE_URL}/api/ingredients/`)
         ingredientLibrary.value = data
     } catch (e) {
         console.error('加载食材库失败', e)
@@ -47,7 +50,7 @@ onMounted(async () => {
     if (isEdit.value) {
         loading.value = true
         try {
-            const { data } = await axios.get(`${API_BASE_URL}/api/recipes/${recipeId.value}/?mode=chef`)
+            const { data } = await chefApi.get(`${API_BASE_URL}/api/recipes/${recipeId.value}/?mode=chef`)
             form.value = { 
                 title: data.title || '',
                 description: data.description || '',
@@ -184,9 +187,9 @@ const submit = async () => {
         }
 
         if (isEdit.value) {
-            await axios.patch(`${API_BASE_URL}/api/recipes/${currentRecipeId}/`, formData)
+            await chefApi.patch(`${API_BASE_URL}/api/recipes/${currentRecipeId}/`, formData)
         } else {
-            const { data } = await axios.post(`${API_BASE_URL}/api/recipes/`, formData)
+            const { data } = await chefApi.post(`${API_BASE_URL}/api/recipes/`, formData)
             currentRecipeId = data.id
         }
 
@@ -199,7 +202,7 @@ const submit = async () => {
                 description: s.description
             }))
             
-            const { data: updatedSteps } = await axios.post(
+            const { data: updatedSteps } = await chefApi.post(
                 `${API_BASE_URL}/api/recipe-steps/batch-update/`, 
                 { recipe_id: currentRecipeId, steps: stepsData }
             )
@@ -211,7 +214,7 @@ const submit = async () => {
                     if (stepId) {
                         const imgFormData = new FormData()
                         imgFormData.append('image', steps.value[i].imageFile)
-                        await axios.post(
+                        await chefApi.post(
                             `${API_BASE_URL}/api/recipe-steps/${stepId}/upload-image/`,
                             imgFormData
                         )
@@ -220,7 +223,7 @@ const submit = async () => {
             }
         } else {
             // 清空所有步骤
-            await axios.post(
+            await chefApi.post(
                 `${API_BASE_URL}/api/recipe-steps/batch-update/`, 
                 { recipe_id: currentRecipeId, steps: [] }
             )
@@ -235,7 +238,7 @@ const submit = async () => {
                 amount: 0
             }))
         
-        await axios.post(
+        await chefApi.post(
             `${API_BASE_URL}/api/recipe-ingredients/batch-update/`,
             { recipe_id: currentRecipeId, ingredients: ingredientsData }
         )

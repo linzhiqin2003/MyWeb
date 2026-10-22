@@ -1,8 +1,10 @@
 <script setup>
 import { ref, onMounted, computed } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
-import axios from 'axios'
 import API_BASE_URL from '../config/api'
+import { chefApi, useChefGuard } from '../composables/useChefAuth'
+
+const { ensureChef } = useChefGuard()
 
 const route = useRoute()
 const router = useRouter()
@@ -11,9 +13,10 @@ const loading = ref(true)
 const currentSection = ref(0) // 0=封面, 1=食材, 2+=步骤
 
 onMounted(async () => {
+  if (!(await ensureChef())) return
   try {
     const id = route.params.id
-    const response = await axios.get(`${API_BASE_URL}/api/recipes/${id}/?mode=chef`)
+    const response = await chefApi.get(`${API_BASE_URL}/api/recipes/${id}/?mode=chef`)
     recipe.value = response.data
   } catch (error) {
     console.error('Failed to fetch recipe', error)
