@@ -219,6 +219,12 @@ class ChefOnlyWriteTests(TestCase):
         self.assertEqual(self.chef.post("/api/blog/tags/", {"name": "新标签"}, format="json").status_code,
                          status.HTTP_201_CREATED)
 
+    def test_chef_list_reports_publish_status(self):
+        # 写作台按 is_published 区分「已发布」和「草稿」，列表里缺这个字段会把所有文章都显示成草稿
+        posts = {p["slug"]: p for p in self.chef.get("/api/blog/posts/?mode=chef").data}
+        self.assertIs(posts["pub"]["is_published"], True)
+        self.assertIs(posts["draft"]["is_published"], False)
+
 
 class AiEndpointAuthTests(TestCase):
     """AI 接口会消耗模型额度：必须登录。"""
